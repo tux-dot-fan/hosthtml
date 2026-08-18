@@ -42,4 +42,4 @@ custom_domain = true
 
 [vars]
 # Public Google OAuth client ID (safe to expose)
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "871603704767-ur63q3uph9i7m53vmafi6l4gbbculj07.apps.googleusercontent.com"
