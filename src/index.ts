@@ -6,7 +6,7 @@ import { createApi } from "./routes/api";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
 import { getHtml } from "./lib/storage";
-import { renderApp, renderLanding } from "./ui";
+import { renderApp, renderLanding, SITE_URL } from "./ui";
 
 type AppEnv = {
   Bindings: Env;
@@ -72,6 +72,53 @@ app.get("/p/:id", async (c) => {
   }
   const html = (await getHtml(c.env, row.path)) ?? "<h1>(empty)</h1>";
   return c.html(html);
+});
+
+// --- SEO static resources ---
+
+// sitemap.xml: home + all public pages (discovered from D1 at request time).
+app.get("/sitemap.xml", async (c) => {
+  const db = getDb(c.env);
+  const rows = await db.select().from(schema.page).where(eq(schema.page.isPublic, true)).all();
+  const urls: string[] = [`${SITE_URL}/`];
+  for (const r of rows) {
+    urls.push(
+      `<url><loc>${SITE_URL}/p/${r.id}</loc><lastmod>${new Date(r.updatedAt).toISOString()}</lastmod><changefreq>monthly</changefreq></url>`,
+    );
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${urls.map((u) => `<url>${u}</url>`).join("\n  ")}
+</urlset>`;
+  return c.body(xml, 200, { "Content-Type": "application/xml; charset=utf-8" });
+});
+
+app.get("/robots.txt", (c) => {
+  const body = `User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /api/
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`;
+  return c.body(body, 200, { "Content-Type": "text/plain; charset=utf-8" });
+});
+
+app.get("/llms.txt", (c) => {
+  const body = `# HostHTML
+
+> Free HTML hosting & sharing. Upload, edit and publish HTML pages — keep them private or share publicly.
+
+## Pages
+- [Home](https://hosthtml.online/): The HostHTML landing page. Free HTML hosting, editor and sharing. No server setup.
+- [App](https://hosthtml.online/app): Sign in with Google to create, edit, publish or privatize your hosted HTML pages.
+
+## How it works
+HostHTML lets you upload HTML content and host it at a public URL (/p/:id). Pages can be public or private. No server configuration required.
+
+_This file is intended for LLMs / AI agents._
+`;
+  return c.body(body, 200, { "Content-Type": "text/plain; charset=utf-8" });
 });
 
 export default app;

@@ -272,6 +272,48 @@ if (document.readyState === "loading") {
 const esc = (s: string): string =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// --- SEO ---
+export const SITE_URL = "https://hosthtml.online";
+export const SITE_NAME = "HostHTML";
+
+const SEO_KEYWORDS =
+  "html hosting, free html hosting, host html page, share html online, html editor online, publish html, html web hosting, online html host, static html hosting, hosthtml";
+
+/** Standard meta + Open Graph + Twitter + canonical for a page. */
+function seoMeta(opts: { title: string; desc: string; path: string; type?: string }): string {
+  const url = SITE_URL + opts.path;
+  const type = opts.type || "website";
+  const img = SITE_URL + "/og-image.png";
+  return `\n<meta name="keywords" content="${SEO_KEYWORDS}" />
+<link rel="canonical" href="${url}" />
+<meta property="og:site_name" content="${SITE_NAME}" />
+<meta property="og:title" content="${esc(opts.title)}" />
+<meta property="og:description" content="${esc(opts.desc)}" />
+<meta property="og:type" content="${type}" />
+<meta property="og:url" content="${url}" />
+<meta property="og:image" content="${img}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${esc(opts.title)}" />
+<meta name="twitter:description" content="${esc(opts.desc)}" />
+<meta name="twitter:image" content="${img}" />`;
+}
+
+/** JSON-LD WebSite structured data. */
+const JSONLD_WEBSITE = `<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "HostHTML",
+  "url": "${SITE_URL}",
+  "description": "Free HTML hosting & sharing. Upload, edit and publish HTML pages; keep them private or public.",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "${SITE_URL}/?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>`;
+
 const BASE_CSS = `
   :root { color-scheme: light; --bg:#fff; --fg:#1f2328; --text:#1f2328; --border:#d8dee4; --muted:#59636e; --accent:#0969da; --bg-elev:#fff; --bg-soft:rgba(0,0,0,.04); --nav-bg:rgba(255,255,255,.85); --hero-grad:linear-gradient(90deg,#4f8cff,#7c5cff); }
   @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg:#0d1117; --fg:#e6edf3; --text:#e6edf3; --border:#30363d; --muted:#8b949e; --accent:#4f8cff; --bg-elev:#161b22; --bg-soft:rgba(255,255,255,.05); --nav-bg:rgba(13,17,23,.85); } }
@@ -336,13 +378,17 @@ const NAVBAR = `
 
 /** Generic app shell — the client app.js decides login vs dashboard. */
 export function renderApp(props: AppProps): string {
+  const title = "HostHTML App · Manage Your Hosted HTML Pages";
+  const desc = "Sign in and manage your hosted HTML pages on HostHTML: create, edit, publish or make pages private.";
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>HostHTML · Host & share HTML pages</title>
-<meta name="description" content="Host, edit and share HTML pages online. Upload HTML, make it public or private, and open it in a browser. Free HTML hosting." />
+<title>${title}</title>
+<meta name="description" content="${desc}" />
+<meta name="robots" content="noindex, nofollow" />
+${seoMeta({ title, desc, path: props.path, type: "webapp" })}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M20 20h24v6H26v6h14v6H26v6h18v6H20z' fill='%23fff'/%3E%3C/svg%3E" />
 <script>
 (function () {
@@ -368,14 +414,19 @@ ${BASE_CSS}
 
 /** Landing page. */
 export function renderLanding(): string {
+  const title = "HostHTML · Free HTML Hosting, Editor & Sharing";
+  const desc =
+    "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>HostHTML · Free HTML hosting & sharing</title>
-<meta name="description" content="Host, edit and share HTML pages online for free. Upload your HTML, keep it private or publish it publicly, and open it in any browser. No server setup." />
+<title>${title}</title>
+<meta name="description" content="${desc}" />
+${seoMeta({ title, desc, path: "/" })}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M20 20h24v6H26v6h14v6H26v6h18v6H20z' fill='%23fff'/%3E%3C/svg%3E" />
+${JSONLD_WEBSITE}
 <style>
 ${BASE_CSS}
 </style>
