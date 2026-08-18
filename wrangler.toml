@@ -1,0 +1,38 @@
+name = "hosthtml"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static assets (favicon, icons). The worker handles all app routes.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Build pipeline: typecheck then inline client JS into src/ui.ts.
+# NOTE: no watch_dir — scripts/inline.mjs rewrites src/ui.ts, so watching src/
+# would trigger an endless rebuild loop under `wrangler dev`. Run `npm run
+# inline` manually when iterating, or rely on deploy's one-shot build.
+[build]
+command = "npm run build"
+cwd = "."
+
+# --- D1 Database (metadata) ---
+[[d1_databases]]
+binding = "DB"
+database_name = "hosthtml-db"
+database_id = ""   # fill with `wrangler d1 create hosthtml-db`
+migrations_dir = "migrations"
+
+# --- R2 Bucket (HTML file storage) ---
+[[r2_buckets]]
+binding = "HTML_BUCKET"
+bucket_name = "hosthtml"   # run: wrangler r2 bucket create hosthtml
+
+# --- Secrets (set via `wrangler secret put`) ---
+# BETTER_AUTH_SECRET   -> openssl rand -base64 32
+# BETTER_AUTH_URL      -> https://your-worker.workers.dev
+# GOOGLE_CLIENT_SECRET
+
+[vars]
+# Public Google OAuth client ID (safe to expose)
+GOOGLE_CLIENT_ID = ""
