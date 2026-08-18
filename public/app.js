@@ -90,13 +90,15 @@ function renderShell(user) {
     <div class="row" style="justify-content:space-between; align-items:center;">
       <h2 style="margin:0;">My Pages</h2>
       <div class="row">
-        <button id="new-page" class="btn" style="padding:8px 14px;">+ New</button>
+        <button id="upload-page" class="btn" style="padding:8px 14px;">⬆ 上传</button>
+        <button id="blank-page" class="btn ghost" style="padding:8px 14px;">+ 空白</button>
         <button id="sign-out" class="btn ghost" style="padding:8px 14px;">Sign out</button>
       </div>
     </div>
     <p class="muted">${escapeHtml(user.email)}</p>
     <ul class="pages" id="page-list"></ul>`;
-  document.getElementById("new-page").onclick = newPage;
+  document.getElementById("upload-page").onclick = uploadPage;
+  document.getElementById("blank-page").onclick = blankPage;
   document.getElementById("sign-out").onclick = async () => {
     await api("/api/auth/sign-out", { method: "POST", body: JSON.stringify({}) });
     location.href = "/";
@@ -170,7 +172,32 @@ async function loadPages() {
   }
 }
 
-async function newPage() {
+// Upload an existing HTML file (default action).
+function uploadPage() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".html,.htm,text/html";
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast("文件太大（上限 2MB）"); return; }
+    const content = await file.text();
+    const title = file.name.replace(/\.(html?)$/i, "") || "Untitled";
+    try {
+      const { page } = await api("/api/pages", {
+        method: "POST",
+        body: JSON.stringify({ title, content }),
+        timeout: 60000,
+      });
+      toast("已上传，打开编辑器 ✏️");
+      location.href = "/app/editor?pageId=" + page.id;
+    } catch (err) { toast("上传失败: " + err.message); }
+  };
+  input.click();
+}
+
+// Create a blank page and open the editor.
+async function blankPage() {
   const title = prompt("Page title?");
   if (!title) return;
   try {

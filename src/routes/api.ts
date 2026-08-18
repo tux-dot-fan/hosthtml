@@ -55,7 +55,9 @@ export function createApi(getAuth: (env: Env) => Auth) {
   });
 
   // ---- Pages CRUD (requires auth) ----
-  api.use("/pages", requireAuth((c) => getAuth(c.env)));
+  // Note: must use "/pages/*" so the middleware also runs for /pages/:id,
+  // /pages/:id PUT/DELETE etc. A bare "/pages" only matches that exact path.
+  api.use("/pages/*", requireAuth((c) => getAuth(c.env)));
 
   api.get("/pages", async (c) => {
     const user = c.get("user");
