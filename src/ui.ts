@@ -51,6 +51,15 @@ const t = I18N;
 const escapeHtml = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
+// Copy text to the clipboard with a toast.
+function copyText(text, okMsg) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast(okMsg)).catch(() => toast(text));
+  } else {
+    toast(text);
+  }
+}
+
 function fmtSize(bytes) {
   const n = Number(bytes) || 0;
   if (n < 1024) return n + " B";
@@ -194,37 +203,48 @@ async function loadPages() {
       list.innerHTML = \`<li class="muted">\${t.noPages}</li>\`;
       return;
     }
+    const copiedMsg = LANG === "zh" ? "链接已复制 📋" : "Link copied 📋";
     list.innerHTML = pages
       .map(
-        (p) => \`
-        <li>
-          <div>
-            <a href="#" data-id="\${p.id}" class="page-title">\${escapeHtml(p.title)}</a>
-            <div class="muted" style="font-size:12px;">
+        (p) => {
+          const pageUrl = p.subdomain ? "https://" + p.subdomain + ".hosthtml.online" : window.location.origin + "/p/" + p.id;
+          return \`
+        <li class="my-card">
+          <div class="my-card-cover" \${p.cover ? \`style="background-image:url('/covers/\${p.id}')"\` : ""}>\${p.cover ? "" : '<span class="my-card-cover-ph">&lt;/&gt;</span>'}</div>
+          <div class="my-card-body">
+            <div class="my-card-top">
+              <a href="#" data-id="\${p.id}" class="my-card-title" title="\${escapeHtml(p.title)}">\${escapeHtml(p.title) || "(untitled)"}</a>
               <span class="vis \${p.isPublic ? "pub" : "priv"}">\${p.isPublic ? t.pub : t.priv}</span>
-              \${fmtSize(p.size)} · \${new Date(p.updatedAt).toLocaleString()}
-              \${p.isPublic ? \` · <a href="/p/\${p.id}" target="_blank">\${t.open}</a>\` : ""}
-              \${p.isPublic && p.subdomain ? \` · <a href="https://\${escapeHtml(p.subdomain)}.hosthtml.online" target="_blank">\${escapeHtml(p.subdomain)}.hosthtml.online ↗</a>\` : ""}
+            </div>
+            \${p.description ? \`<div class="my-card-desc">\${escapeHtml(p.description)}</div>\` : ""}
+            <div class="my-card-url">
+              <span class="my-url-text" title="\${escapeHtml(pageUrl)}">\${escapeHtml(pageUrl)}</span>
+              <button class="my-url-copy" data-url="\${escapeHtml(pageUrl)}" title="copy">📋</button>
+            </div>
+            <div class="my-card-meta">\${fmtSize(p.size)} · \${new Date(p.updatedAt).toLocaleString()}</div>
+            <div class="page-actions">
+              <button class="edit" data-id="\${p.id}">\${t.actEdit}</button>
+              <button class="view" data-id="\${p.id}">\${t.actView}</button>
+              <button class="pub-toggle" data-id="\${p.id}" data-pub="\${p.isPublic}">\${p.isPublic ? t.actPriv : t.actPub}</button>
+              <button class="del" data-id="\${p.id}">🗑</button>
             </div>
           </div>
-          <div class="page-actions">
-            <button class="edit" data-id="\${p.id}">\${t.actEdit}</button>
-            <button class="view" data-id="\${p.id}">\${t.actView}</button>
-            <button class="pub-toggle" data-id="\${p.id}" data-pub="\${p.isPublic}">\${p.isPublic ? t.actPriv : t.actPub}</button>
-            <button class="del" data-id="\${p.id}">🗑</button>
-          </div>
-        </li>\`,
+        </li>\`;
+        },
       )
       .join("");
-    list.querySelectorAll(".page-title, .view").forEach((el) => {
+    list.querySelectorAll(".my-card-title, .view").forEach((el) => {
       el.onclick = (e) => {
         e.preventDefault();
         const id = el.dataset.id;
         location.href = "/p/" + id;
       };
     });
+    list.querySelectorAll(".my-url-copy").forEach((b) => {
+      b.onclick = () => copyText(b.dataset.url, copiedMsg);
+    });
     list.querySelectorAll(".edit").forEach((b) => {
-      b.onclick = () => { location.href = "/app/editor?pageId=" + b.dataset.id; };
+      b.onclick = () => { location.href = "/app/editor?pageId=" + b.dataset.id + (LANG === "zh" ? "&lang=zh" : ""); };
     });
     list.querySelectorAll(".pub-toggle").forEach((b) => {
       b.onclick = async () => {
@@ -314,9 +334,10 @@ async function renderEditor(pageId) {
     root.innerHTML = \`<p>\${t.loadFailed} \${escapeHtml(err.message)}</p>\`;
     return;
   }
+  const moreLabel = LANG === "zh" ? "更多设置 ▾" : "More settings ▾";
   root.innerHTML = \`
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">\${t.editorTitle}\${escapeHtml(page.title)}</h2>
+      <input id="ed-title" class="ed-title-input" value="\${escapeHtml(page.title)}" placeholder="\${LANG === "zh" ? "页面标题" : "Page title"}" />
       <div class="row">
         <button id="ed-open" class="btn ghost" style="padding:8px 14px;">\${t.open}</button>
         <button id="ed-back" class="btn ghost" style="padding:8px 14px;">\${t.back}</button>
@@ -327,20 +348,32 @@ async function renderEditor(pageId) {
       <span class="vis \${page.isPublic ? "pub" : "priv"}">\${page.isPublic ? t.pub : t.priv}</span>
       <label style="margin-left:12px;"><input type="checkbox" id="ed-pub" \${page.isPublic ? "checked" : ""} /> \${LANG === "zh" ? "公开" : "Public"}</label>
     </div>
-    <div class="muted" style="margin-bottom:12px;">
-      <label>\${t.subLabel}：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="\${t.subPlaceholder}" /> .hosthtml.online</label>
-      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.subCopy}</button>
-    </div>
-    <div class="muted" style="margin-bottom:12px;">
-      <label>\${t.descLabel}：<input id="ed-desc" style="width:70%;" value="\${escapeHtml(page.description || "")}" placeholder="\${t.descPlaceholder}" maxlength="200" /></label>
-    </div>
-    <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
-      <span>\${t.coverLabel}：</span>
-      <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); \${page.cover ? "" : "display:none;"}" src="/covers/\${page.id}" alt="" />
-      <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.coverUpload}</button>
-      <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; \${page.cover ? "" : "display:none;"}">\${t.coverRemove}</button>
+    <button id="ed-more" class="btn ghost" style="padding:6px 12px; font-size:13px; margin-bottom:12px;">\${moreLabel}</button>
+    <div id="ed-advanced" class="ed-advanced" style="display:none;">
+      <div class="muted" style="margin-bottom:12px;">
+        <label>\${t.subLabel}：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="\${t.subPlaceholder}" /> .hosthtml.online</label>
+        <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.subCopy}</button>
+      </div>
+      <div class="muted" style="margin-bottom:12px;">
+        <label>\${t.descLabel}：<input id="ed-desc" style="width:70%;" value="\${escapeHtml(page.description || "")}" placeholder="\${t.descPlaceholder}" maxlength="200" /></label>
+      </div>
+      <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <span>\${t.coverLabel}：</span>
+        <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); \${page.cover ? "" : "display:none;"}" src="/covers/\${page.id}" alt="" />
+        <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.coverUpload}</button>
+        <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; \${page.cover ? "" : "display:none;"}">\${t.coverRemove}</button>
+      </div>
     </div>
     <textarea id="ed-content" spellcheck="false">\${escapeHtml(page.content || "")}</textarea>\`;
+  // Toggle the advanced settings (subdomain, description, cover).
+  const adv = document.getElementById("ed-advanced");
+  const advBtn = document.getElementById("ed-more");
+  let advOpen = false;
+  advBtn.onclick = () => {
+    advOpen = !advOpen;
+    adv.style.display = advOpen ? "" : "none";
+    advBtn.textContent = advOpen ? (LANG === "zh" ? "收起设置 ▴" : "Hide settings ▴") : moreLabel;
+  };
   document.getElementById("ed-copy-sub").onclick = () => {
     const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
     const url = sub ? "https://" + sub + ".hosthtml.online" : window.location.origin + "/p/" + pageId;
@@ -379,7 +412,7 @@ async function renderEditor(pageId) {
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
-    const title = page.title;
+    const title = (document.getElementById("ed-title").value.trim() || page.title) ;
     const subdomain = document.getElementById("ed-sub").value.trim();
     const description = document.getElementById("ed-desc").value.trim();
     const payload = { content, isPublic, title, subdomain, description };
@@ -575,11 +608,24 @@ const BASE_CSS = `
   textarea, input { padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: transparent; color: inherit; font-family: inherit; font-size: 14px; }
   textarea { width: 100%; min-height: 60vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.6; resize: vertical; }
   .row { display: flex; gap: 10px; align-items: center; }
-  ul.pages { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-  ul.pages li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; }
+  /* my pages card grid */
+  ul.pages { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
   ul.pages a { font-weight: 600; color: var(--text); text-decoration: none; }
   ul.pages a:hover { color: var(--accent); }
-  .vis { font-size: 12px; padding: 2px 8px; border-radius: 20px; }
+  .my-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev); transition: transform .12s, box-shadow .12s, border-color .12s; display: flex; flex-direction: column; }
+  .my-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); border-color: var(--accent); }
+  .my-card-cover { height: 130px; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; flex: none; }
+  .my-card-cover-ph { font-size: 26px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .my-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .my-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .my-card-title { font-weight: 650; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .my-card-desc { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .my-card-url { display: flex; align-items: center; gap: 6px; background: var(--bg-soft); border-radius: 7px; padding: 4px 8px; }
+  .my-url-text { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .my-url-copy { flex: none; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px; }
+  .my-url-copy:hover { color: var(--accent); }
+  .my-card-meta { font-size: 12px; color: var(--muted); }
+  .vis { font-size: 12px; padding: 2px 8px; border-radius: 20px; flex: none; }
   .vis.pub { background: rgba(46,160,67,.15); color: #2da44e; }
   .vis.priv { background: rgba(177,186,196,.2); color: var(--muted); }
   .page-actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -588,6 +634,9 @@ const BASE_CSS = `
   .page-actions button.edit { border-color: rgba(47,129,247,.5); color: #2f81f7; }
   .page-actions button.pub-toggle { border-color: rgba(46,160,67,.5); color: #2da44e; }
   .page-actions button.del { border-color: rgba(248,81,73,.5); color: #f85149; }
+  /* editor title input + advanced settings */
+  .ed-title-input { flex: 1; font-size: 20px; font-weight: 700; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; background: transparent; color: var(--text); min-width: 0; }
+  .ed-advanced { border: 1px dashed var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
   .hero { text-align: center; padding: 60px 20px 40px; }
   .hero h1 { font-size: 40px; margin: 0 0 12px; letter-spacing: -.02em; }
   .hero p { font-size: 17px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
@@ -622,7 +671,7 @@ const BASE_CSS = `
   .pager .pg:hover { background: var(--bg-soft); border-color: var(--accent); color: var(--accent); }
   .pager .pg.off { opacity: .4; pointer-events: none; }
   .pager .pg-now { font-size: 13px; color: var(--muted); }
-  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } }
+  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages { grid-template-columns: 1fr; } }
 `;
 
 export interface AppProps {

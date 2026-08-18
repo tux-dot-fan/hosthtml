@@ -47,6 +47,15 @@ const t = I18N;
 const escapeHtml = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
+// Copy text to the clipboard with a toast.
+function copyText(text, okMsg) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast(okMsg)).catch(() => toast(text));
+  } else {
+    toast(text);
+  }
+}
+
 function fmtSize(bytes) {
   const n = Number(bytes) || 0;
   if (n < 1024) return n + " B";
@@ -190,37 +199,48 @@ async function loadPages() {
       list.innerHTML = `<li class="muted">${t.noPages}</li>`;
       return;
     }
+    const copiedMsg = LANG === "zh" ? "链接已复制 📋" : "Link copied 📋";
     list.innerHTML = pages
       .map(
-        (p) => `
-        <li>
-          <div>
-            <a href="#" data-id="${p.id}" class="page-title">${escapeHtml(p.title)}</a>
-            <div class="muted" style="font-size:12px;">
+        (p) => {
+          const pageUrl = p.subdomain ? "https://" + p.subdomain + ".hosthtml.online" : window.location.origin + "/p/" + p.id;
+          return `
+        <li class="my-card">
+          <div class="my-card-cover" ${p.cover ? `style="background-image:url('/covers/${p.id}')"` : ""}>${p.cover ? "" : '<span class="my-card-cover-ph">&lt;/&gt;</span>'}</div>
+          <div class="my-card-body">
+            <div class="my-card-top">
+              <a href="#" data-id="${p.id}" class="my-card-title" title="${escapeHtml(p.title)}">${escapeHtml(p.title) || "(untitled)"}</a>
               <span class="vis ${p.isPublic ? "pub" : "priv"}">${p.isPublic ? t.pub : t.priv}</span>
-              ${fmtSize(p.size)} · ${new Date(p.updatedAt).toLocaleString()}
-              ${p.isPublic ? ` · <a href="/p/${p.id}" target="_blank">${t.open}</a>` : ""}
-              ${p.isPublic && p.subdomain ? ` · <a href="https://${escapeHtml(p.subdomain)}.hosthtml.online" target="_blank">${escapeHtml(p.subdomain)}.hosthtml.online ↗</a>` : ""}
+            </div>
+            ${p.description ? `<div class="my-card-desc">${escapeHtml(p.description)}</div>` : ""}
+            <div class="my-card-url">
+              <span class="my-url-text" title="${escapeHtml(pageUrl)}">${escapeHtml(pageUrl)}</span>
+              <button class="my-url-copy" data-url="${escapeHtml(pageUrl)}" title="copy">📋</button>
+            </div>
+            <div class="my-card-meta">${fmtSize(p.size)} · ${new Date(p.updatedAt).toLocaleString()}</div>
+            <div class="page-actions">
+              <button class="edit" data-id="${p.id}">${t.actEdit}</button>
+              <button class="view" data-id="${p.id}">${t.actView}</button>
+              <button class="pub-toggle" data-id="${p.id}" data-pub="${p.isPublic}">${p.isPublic ? t.actPriv : t.actPub}</button>
+              <button class="del" data-id="${p.id}">🗑</button>
             </div>
           </div>
-          <div class="page-actions">
-            <button class="edit" data-id="${p.id}">${t.actEdit}</button>
-            <button class="view" data-id="${p.id}">${t.actView}</button>
-            <button class="pub-toggle" data-id="${p.id}" data-pub="${p.isPublic}">${p.isPublic ? t.actPriv : t.actPub}</button>
-            <button class="del" data-id="${p.id}">🗑</button>
-          </div>
-        </li>`,
+        </li>`;
+        },
       )
       .join("");
-    list.querySelectorAll(".page-title, .view").forEach((el) => {
+    list.querySelectorAll(".my-card-title, .view").forEach((el) => {
       el.onclick = (e) => {
         e.preventDefault();
         const id = el.dataset.id;
         location.href = "/p/" + id;
       };
     });
+    list.querySelectorAll(".my-url-copy").forEach((b) => {
+      b.onclick = () => copyText(b.dataset.url, copiedMsg);
+    });
     list.querySelectorAll(".edit").forEach((b) => {
-      b.onclick = () => { location.href = "/app/editor?pageId=" + b.dataset.id; };
+      b.onclick = () => { location.href = "/app/editor?pageId=" + b.dataset.id + (LANG === "zh" ? "&lang=zh" : ""); };
     });
     list.querySelectorAll(".pub-toggle").forEach((b) => {
       b.onclick = async () => {
@@ -310,9 +330,10 @@ async function renderEditor(pageId) {
     root.innerHTML = `<p>${t.loadFailed} ${escapeHtml(err.message)}</p>`;
     return;
   }
+  const moreLabel = LANG === "zh" ? "更多设置 ▾" : "More settings ▾";
   root.innerHTML = `
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">${t.editorTitle}${escapeHtml(page.title)}</h2>
+      <input id="ed-title" class="ed-title-input" value="${escapeHtml(page.title)}" placeholder="${LANG === "zh" ? "页面标题" : "Page title"}" />
       <div class="row">
         <button id="ed-open" class="btn ghost" style="padding:8px 14px;">${t.open}</button>
         <button id="ed-back" class="btn ghost" style="padding:8px 14px;">${t.back}</button>
@@ -323,20 +344,32 @@ async function renderEditor(pageId) {
       <span class="vis ${page.isPublic ? "pub" : "priv"}">${page.isPublic ? t.pub : t.priv}</span>
       <label style="margin-left:12px;"><input type="checkbox" id="ed-pub" ${page.isPublic ? "checked" : ""} /> ${LANG === "zh" ? "公开" : "Public"}</label>
     </div>
-    <div class="muted" style="margin-bottom:12px;">
-      <label>${t.subLabel}：<input id="ed-sub" style="width:220px;" value="${escapeHtml(page.subdomain || "")}" placeholder="${t.subPlaceholder}" /> .hosthtml.online</label>
-      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">${t.subCopy}</button>
-    </div>
-    <div class="muted" style="margin-bottom:12px;">
-      <label>${t.descLabel}：<input id="ed-desc" style="width:70%;" value="${escapeHtml(page.description || "")}" placeholder="${t.descPlaceholder}" maxlength="200" /></label>
-    </div>
-    <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
-      <span>${t.coverLabel}：</span>
-      <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); ${page.cover ? "" : "display:none;"}" src="/covers/${page.id}" alt="" />
-      <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">${t.coverUpload}</button>
-      <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; ${page.cover ? "" : "display:none;"}">${t.coverRemove}</button>
+    <button id="ed-more" class="btn ghost" style="padding:6px 12px; font-size:13px; margin-bottom:12px;">${moreLabel}</button>
+    <div id="ed-advanced" class="ed-advanced" style="display:none;">
+      <div class="muted" style="margin-bottom:12px;">
+        <label>${t.subLabel}：<input id="ed-sub" style="width:220px;" value="${escapeHtml(page.subdomain || "")}" placeholder="${t.subPlaceholder}" /> .hosthtml.online</label>
+        <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">${t.subCopy}</button>
+      </div>
+      <div class="muted" style="margin-bottom:12px;">
+        <label>${t.descLabel}：<input id="ed-desc" style="width:70%;" value="${escapeHtml(page.description || "")}" placeholder="${t.descPlaceholder}" maxlength="200" /></label>
+      </div>
+      <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <span>${t.coverLabel}：</span>
+        <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); ${page.cover ? "" : "display:none;"}" src="/covers/${page.id}" alt="" />
+        <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">${t.coverUpload}</button>
+        <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; ${page.cover ? "" : "display:none;"}">${t.coverRemove}</button>
+      </div>
     </div>
     <textarea id="ed-content" spellcheck="false">${escapeHtml(page.content || "")}</textarea>`;
+  // Toggle the advanced settings (subdomain, description, cover).
+  const adv = document.getElementById("ed-advanced");
+  const advBtn = document.getElementById("ed-more");
+  let advOpen = false;
+  advBtn.onclick = () => {
+    advOpen = !advOpen;
+    adv.style.display = advOpen ? "" : "none";
+    advBtn.textContent = advOpen ? (LANG === "zh" ? "收起设置 ▴" : "Hide settings ▴") : moreLabel;
+  };
   document.getElementById("ed-copy-sub").onclick = () => {
     const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
     const url = sub ? "https://" + sub + ".hosthtml.online" : window.location.origin + "/p/" + pageId;
@@ -375,7 +408,7 @@ async function renderEditor(pageId) {
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
-    const title = page.title;
+    const title = (document.getElementById("ed-title").value.trim() || page.title) ;
     const subdomain = document.getElementById("ed-sub").value.trim();
     const description = document.getElementById("ed-desc").value.trim();
     const payload = { content, isPublic, title, subdomain, description };
