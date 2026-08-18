@@ -20,13 +20,20 @@ cwd = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "hosthtml-db"
-database_id = ""   # fill with `wrangler d1 create hosthtml-db`
+database_id = "f3ba95ca-1f66-4a0b-b2c6-6858d92df74a"
 migrations_dir = "migrations"
 
 # --- R2 Bucket (HTML file storage) ---
 [[r2_buckets]]
 binding = "HTML_BUCKET"
 bucket_name = "hosthtml"   # run: wrangler r2 bucket create hosthtml
+
+# --- Custom domain ---
+# Bind the custom domain as a Workers route on deploy. DNS already points to
+# the worker (user confirmed).
+[[routes]]
+pattern = "hosthtml.online"
+custom_domain = true
 
 # --- Secrets (set via `wrangler secret put`) ---
 # BETTER_AUTH_SECRET   -> openssl rand -base64 32
