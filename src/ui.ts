@@ -407,7 +407,22 @@ const BASE_CSS = `
   .feature p { margin: 0; color: var(--muted); font-size: 14px; }
   .feature .icon { font-size: 22px; margin-bottom: 10px; }
   .subdomain-demo { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-soft); border-radius: 8px; padding: 3px 10px; font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
-  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } }
+  /* recently published list */
+  .pub-section { margin-top: 44px; }
+  .pub-section h2 { font-size: 20px; margin: 0 0 14px; }
+  .pub-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .pub-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; }
+  .pub-list a { font-weight: 600; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pub-list a:hover { color: var(--accent); }
+  .pub-list code { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .pub-meta { font-size: 12px; color: var(--muted); flex: none; }
+  .pub-list li.empty { justify-content: center; color: var(--muted); }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+  .pager .pg { padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; font-size: 13px; }
+  .pager .pg:hover { background: var(--bg-soft); border-color: var(--accent); color: var(--accent); }
+  .pager .pg.off { opacity: .4; pointer-events: none; }
+  .pager .pg-now { font-size: 13px; color: var(--muted); }
+  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } .pub-list li { flex-direction: column; align-items: flex-start; } }
 `;
 
 export interface AppProps {
@@ -461,11 +476,44 @@ ${BASE_CSS}
 </html>`;
 }
 
+export interface PublicPage {
+  id: string;
+  title: string;
+  subdomain: string | null;
+  updatedAt: number;
+}
+
 /** Landing page. */
-export function renderLanding(): string {
+export function renderLanding(opts: { pages: PublicPage[]; page: number; totalPages: number } = { pages: [], page: 1, totalPages: 1 }): string {
   const title = "HostHTML · Free HTML Hosting, Editor & Sharing";
   const desc =
     "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
+
+  // Paginated list of recently published pages.
+  const listItems = opts.pages.length
+    ? opts.pages
+        .map(
+          (p) => `
+        <li>
+          <a href="/p/${esc(p.id)}">${esc(p.title) || "(untitled)"}</a>
+          <span class="pub-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString()}</span>
+        </li>`,
+        )
+        .join("")
+    : `<li class="empty">No public pages yet. Sign in and publish your first HTML page.</li>`;
+
+  // Pagination controls.
+  let pager = "";
+  if (opts.totalPages > 1) {
+    const prevHref = opts.page > 1 ? `/?page=${opts.page - 1}` : null;
+    const nextHref = opts.page < opts.totalPages ? `/?page=${opts.page + 1}` : null;
+    pager = `<div class="pager">
+      ${prevHref ? `<a class="pg" href="${prevHref}">← Prev</a>` : `<span class="pg off">← Prev</span>`}
+      <span class="pg-now">${opts.page} / ${opts.totalPages}</span>
+      ${nextHref ? `<a class="pg" href="${nextHref}">Next →</a>` : `<span class="pg off">Next →</span>`}
+    </div>`;
+  }
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -487,6 +535,12 @@ ${BASE_CSS}
       <h1>HostHTML</h1>
       <p>Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.</p>
       <a class="btn" href="/app">Open app →</a>
+    </section>
+
+    <section class="pub-section">
+      <h2>Recently published</h2>
+      <ul class="pub-list">${listItems}</ul>
+      ${pager}
     </section>
 
     <section class="features">

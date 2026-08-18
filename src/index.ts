@@ -82,7 +82,39 @@ app.all("/api/auth/*", async (c) => c.get("auth").handler(c.req.raw));
 app.route("/api", createApi((env) => createAuth(env)));
 
 // --- Pages ---
-app.get("/", (c) => c.html(renderLanding()));
+// Home: render the landing page plus a paginated list of public pages.
+app.get("/", async (c) => {
+  const perPage = 30;
+  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10) || 1);
+  const offset = (page - 1) * perPage;
+  const db = getDb(c.env);
+  const rows = await db
+    .select()
+    .from(schema.page)
+    .where(eq(schema.page.isPublic, true))
+    .orderBy(schema.page.updatedAt)
+    .limit(perPage)
+    .offset(offset)
+    .all();
+  const total = await db
+    .select({ id: schema.page.id })
+    .from(schema.page)
+    .where(eq(schema.page.isPublic, true))
+    .all();
+  const totalPages = Math.max(1, Math.ceil(total.length / perPage));
+  return c.html(
+    renderLanding({
+      pages: rows.map((p) => ({
+        id: p.id,
+        title: p.title,
+        subdomain: p.subdomain,
+        updatedAt: p.updatedAt,
+      })),
+      page,
+      totalPages,
+    }),
+  );
+});
 
 app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
