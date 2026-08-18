@@ -17,6 +17,39 @@ function fmtSize(bytes) {
   return (n / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 }
 
+// Compress an image file to a small data URL (JPEG/WebP, max 800px) for covers.
+function compressImage(file, maxW = 800, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const useWebp = typeof canvas.toDataURL === "function" && canvas.toDataURL("image/webp").length < canvas.toDataURL("image/jpeg").length;
+      resolve(canvas.toDataURL(useWebp ? "image/webp" : "image/jpeg", quality));
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("无法读取图片")); };
+    img.src = url;
+  });
+}
+
+// Extract a description and cover-image URL from raw HTML.
+function extractPageMeta(html) {
+  const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
+                    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+  const description = descMatch ? descMatch[1].trim().slice(0, 200) : "";
+  // Prefer an og:image, else the first <img> src.
+  let cover = "";
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+  const src = og ? og[1] : (html.match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1];
+  if (src) cover = src.trim();
+  return { description, cover };
+}
+
 async function api(path, init = {}) {
   const timeout = init.timeout ?? 15000;
   const ctrl = typeof AbortController === "function" ? new AbortController() : null;
@@ -187,10 +220,26 @@ function uploadPage() {
     if (file.size > 2 * 1024 * 1024) { toast("文件太大（上限 2MB）"); return; }
     const content = await file.text();
     const title = file.name.replace(/\\.(html?)$/i, "") || "Untitled";
+    // Auto-extract description + cover image from the HTML.
+    const { description, cover } = extractPageMeta(content);
+    let coverData = null;
+    if (cover) {
+      try {
+        if (cover.startsWith("data:image/")) {
+          // Inline image already — use it directly (it's already small enough).
+          coverData = cover;
+        } else {
+          // External URL — fetch (same-origin/relative resolved) and compress.
+          const abs = new URL(cover, window.location.origin).href;
+          const blob = await (await fetch(abs)).blob();
+          coverData = await compressImage(new File([blob], "cover", { type: blob.type || "image/png" }));
+        }
+      } catch (e) { /* cover extraction failed — ignore */ }
+    }
     try {
       const { page } = await api("/api/pages", {
         method: "POST",
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content, description, cover: coverData || undefined }),
         timeout: 60000,
       });
       toast("已上传，打开编辑器 ✏️");
@@ -240,6 +289,15 @@ async function renderEditor(pageId) {
       <label>专属网址：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="my-page" /> .hosthtml.online</label>
       <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">📋 复制</button>
     </div>
+    <div class="muted" style="margin-bottom:12px;">
+      <label>描述：<input id="ed-desc" style="width:70%;" value="\${escapeHtml(page.description || "")}" placeholder="简短描述（首页卡片显示）" maxlength="200" /></label>
+    </div>
+    <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+      <span>封面：</span>
+      <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); \${page.cover ? "" : "display:none;"}" src="/covers/\${page.id}" alt="" />
+      <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">🖼 上传封面</button>
+      <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; \${page.cover ? "" : "display:none;"}">✕ 移除</button>
+    </div>
     <textarea id="ed-content" spellcheck="false">\${escapeHtml(page.content || "")}</textarea>\`;
   document.getElementById("ed-copy-sub").onclick = () => {
     const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
@@ -251,14 +309,43 @@ async function renderEditor(pageId) {
       toast(text);
     }
   };
+  // Track a newly-picked cover (data URL) so save can upload it; '' removes.
+  let coverDataUrl = null; // null = unchanged, '' = remove, else new data URL
+  document.getElementById("ed-cover-pick").onclick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      try { coverDataUrl = await compressImage(f); }
+      catch (e) { toast("封面处理失败: " + e.message); return; }
+      const img = document.getElementById("ed-cover-preview");
+      img.src = coverDataUrl; img.style.display = "";
+      document.getElementById("ed-cover-remove").style.display = "";
+      toast("封面已就绪，保存时生效 🖼");
+    };
+    input.click();
+  };
+  document.getElementById("ed-cover-remove").onclick = () => {
+    coverDataUrl = "";
+    const img = document.getElementById("ed-cover-preview");
+    img.style.display = "none";
+    document.getElementById("ed-cover-remove").style.display = "none";
+  };
+
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
     const title = page.title;
     const subdomain = document.getElementById("ed-sub").value.trim();
+    const description = document.getElementById("ed-desc").value.trim();
+    const payload = { content, isPublic, title, subdomain, description };
+    if (coverDataUrl !== null) payload.cover = coverDataUrl; // new data URL or '' to remove
     try {
-      await api(\`/api/pages/\${pageId}\`, { method: "PUT", body: JSON.stringify({ content, isPublic, title, subdomain }), timeout: 60000 });
+      await api(\`/api/pages/\${pageId}\`, { method: "PUT", body: JSON.stringify(payload), timeout: 60000 });
       toast("Saved 💾");
+      coverDataUrl = null;
     } catch (err) { toast("Save failed: " + err.message); }
   };
   document.getElementById("ed-open").onclick = () => { location.href = "/p/" + pageId; };
@@ -407,22 +494,27 @@ const BASE_CSS = `
   .feature p { margin: 0; color: var(--muted); font-size: 14px; }
   .feature .icon { font-size: 22px; margin-bottom: 10px; }
   .subdomain-demo { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-soft); border-radius: 8px; padding: 3px 10px; font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
-  /* recently published list */
+  /* recently published cards */
   .pub-section { margin-top: 44px; }
   .pub-section h2 { font-size: 20px; margin: 0 0 14px; }
-  .pub-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-  .pub-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; }
-  .pub-list a { font-weight: 600; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pub-list a:hover { color: var(--accent); }
-  .pub-list code { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
-  .pub-meta { font-size: 12px; color: var(--muted); flex: none; }
-  .pub-list li.empty { justify-content: center; color: var(--muted); }
-  .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+  .pub-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .pub-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev); transition: transform .12s, box-shadow .12s, border-color .12s; }
+  .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); border-color: var(--accent); }
+  .pub-card-link { text-decoration: none !important; display: block; }
+  .pub-cover { height: 130px; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
+  .pub-cover-placeholder { font-size: 28px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .pub-card-body { padding: 12px 14px 14px; }
+  .pub-card-title { font-weight: 650; color: var(--text); font-size: 15px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pub-card-desc { color: var(--muted); font-size: 13px; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pub-card-meta { font-size: 12px; color: var(--muted); }
+  .pub-card-meta code { font-family: ui-monospace, monospace; }
+  .pub-list li.empty { grid-column: 1 / -1; justify-self: center; color: var(--muted); padding: 20px; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 22px; }
   .pager .pg { padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; font-size: 13px; }
   .pager .pg:hover { background: var(--bg-soft); border-color: var(--accent); color: var(--accent); }
   .pager .pg.off { opacity: .4; pointer-events: none; }
   .pager .pg-now { font-size: 13px; color: var(--muted); }
-  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } .pub-list li { flex-direction: column; align-items: flex-start; } }
+  @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } }
 `;
 
 export interface AppProps {
@@ -480,6 +572,8 @@ export interface PublicPage {
   id: string;
   title: string;
   subdomain: string | null;
+  cover: string | null;
+  description: string | null;
   updatedAt: number;
 }
 
@@ -489,14 +583,20 @@ export function renderLanding(opts: { pages: PublicPage[]; page: number; totalPa
   const desc =
     "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
 
-  // Paginated list of recently published pages.
+  // Paginated list of recently published pages, shown as cards.
   const listItems = opts.pages.length
     ? opts.pages
         .map(
           (p) => `
-        <li>
-          <a href="/p/${esc(p.id)}">${esc(p.title) || "(untitled)"}</a>
-          <span class="pub-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString()}</span>
+        <li class="pub-card">
+          <a class="pub-card-link" href="/p/${esc(p.id)}">
+            <div class="pub-cover" ${p.cover ? `style="background-image:url('/covers/${esc(p.id)}')"` : ""}>${p.cover ? "" : '<span class="pub-cover-placeholder">&lt;/&gt;</span>'}</div>
+            <div class="pub-card-body">
+              <div class="pub-card-title">${esc(p.title) || "(untitled)"}</div>
+              ${p.description ? `<div class="pub-card-desc">${esc(p.description)}</div>` : ""}
+              <div class="pub-card-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString()}</div>
+            </div>
+          </a>
         </li>`,
         )
         .join("")

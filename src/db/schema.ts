@@ -58,6 +58,8 @@ export const page = sqliteTable(
     slug: text("slug").notNull(),             // human/URL-friendly name
     subdomain: text("subdomain"),             // sub-domain prefix: <subdomain>.hosthtml.online
     path: text("path").notNull(),             // R2 key: "users/<userId>/<pageId>.html"
+    cover: text("cover"),                     // R2 key for cover image: "covers/<pageId>.<ext>"
+    description: text("description"),         // short page description / excerpt
     size: integer("size").notNull().default(0),
     isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("createdAt").notNull(),

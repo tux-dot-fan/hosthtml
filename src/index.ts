@@ -5,7 +5,7 @@ import { createAuth } from "./auth";
 import { createApi } from "./routes/api";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
-import { getHtml } from "./lib/storage";
+import { getCover, getHtml } from "./lib/storage";
 import { renderApp, renderLanding, SITE_URL } from "./ui";
 
 type AppEnv = {
@@ -108,6 +108,8 @@ app.get("/", async (c) => {
         id: p.id,
         title: p.title,
         subdomain: p.subdomain,
+        cover: p.cover,
+        description: p.description,
         updatedAt: p.updatedAt,
       })),
       page,
@@ -118,6 +120,23 @@ app.get("/", async (c) => {
 
 app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
+
+// --- Cover image: served from R2 (page id -> its cover). ---
+app.get("/covers/:id", async (c) => {
+  const id = c.req.param("id");
+  const db = getDb(c.env);
+  const row = await db.select().from(schema.page).where(eq(schema.page.id, id)).get();
+  if (!row || !row.cover) return c.notFound();
+  const cover = await getCover(c.env, row.cover);
+  if (!cover) return c.notFound();
+  return new Response(cover.body, {
+    status: 200,
+    headers: {
+      "Content-Type": cover.contentType,
+      "Cache-Control": "public, max-age=86400",
+    },
+  });
+});
 
 // --- Public open page: serve the hosted HTML directly if public ---
 // If the page is private, we return a minimal 404-ish HTML instead of leaking.

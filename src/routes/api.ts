@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { ulid } from "ulid";
 import { getDb } from "../db";
 import * as schema from "../db/schema";
-import { deleteHtml, pageKey, putHtml } from "../lib/storage";
+import { deleteCover, deleteHtml, pageKey, putCover, putHtml } from "../lib/storage";
 import type { Auth } from "../auth";
 import type { Env } from "../env";
 import { requireAuth, type UserVar } from "../lib/auth-mw";
@@ -73,6 +73,8 @@ export function createApi(getAuth: (env: Env) => Auth) {
         title: p.title,
         slug: p.slug,
         subdomain: p.subdomain,
+        cover: p.cover,
+        description: p.description,
         size: p.size,
         isPublic: p.isPublic,
         updatedAt: p.updatedAt,
@@ -82,7 +84,7 @@ export function createApi(getAuth: (env: Env) => Auth) {
 
   api.post("/pages", async (c) => {
     const user = c.get("user");
-    const { title, content } = await c.req.json();
+    const { title, content, cover, description } = await c.req.json();
     if (!title || typeof content !== "string") return c.json({ error: "title and content are required" }, 400);
 
     const id = ulid();
@@ -92,6 +94,13 @@ export function createApi(getAuth: (env: Env) => Auth) {
 
     const db = getDb(c.env);
     const subdomain = await uniqueSubdomain(db, String(title));
+    // Optional cover image (data URL, already compressed client-side) and description.
+    let coverKey = null;
+    if (typeof cover === "string" && cover.startsWith("data:image/")) {
+      coverKey = await putCover(c.env, id, cover);
+    }
+    const descriptionVal = typeof description === "string" ? description.trim().slice(0, 200) : null;
+
     await db.insert(schema.page).values({
       id,
       userId: user.id,
@@ -99,12 +108,14 @@ export function createApi(getAuth: (env: Env) => Auth) {
       slug: slugify(String(title)) + "-" + id.slice(-4),
       subdomain,
       path: key,
+      cover: coverKey,
+      description: descriptionVal,
       size,
       isPublic: false,
       createdAt: now,
       updatedAt: now,
     });
-    return c.json({ page: { id, title, isPublic: false, subdomain } }, 201);
+    return c.json({ page: { id, title, isPublic: false, subdomain, cover: coverKey, description: descriptionVal } }, 201);
   });
 
   api.get("/pages/:id", async (c) => {
@@ -122,6 +133,8 @@ export function createApi(getAuth: (env: Env) => Auth) {
         title: row.title,
         slug: row.slug,
         subdomain: row.subdomain,
+        cover: row.cover,
+        description: row.description,
         size: row.size,
         isPublic: row.isPublic,
         updatedAt: row.updatedAt,
@@ -152,12 +165,29 @@ export function createApi(getAuth: (env: Env) => Auth) {
       if (want) subdomain = await uniqueSubdomain(db, want, id);
     }
 
+    // Optional: update description.
+    let description = row.description;
+    if (typeof body.description === "string") description = body.description.trim().slice(0, 200) || null;
+
+    // Optional: update cover. A new data URL replaces it; null removes it.
+    let cover = row.cover;
+    if (typeof body.cover === "string") {
+      if (body.cover.startsWith("data:image/")) {
+        const newKey = await putCover(c.env, id, body.cover);
+        if (row.cover && row.cover !== newKey) await deleteCover(c.env, row.cover);
+        cover = newKey;
+      } else if (body.cover === "") {
+        if (row.cover) await deleteCover(c.env, row.cover);
+        cover = null;
+      }
+    }
+
     await db
       .update(schema.page)
-      .set({ title, isPublic, size, subdomain, updatedAt: Date.now() })
+      .set({ title, isPublic, size, subdomain, cover, description, updatedAt: Date.now() })
       .where(eq(schema.page.id, id));
 
-    return c.json({ page: { id, title, isPublic, size, subdomain } });
+    return c.json({ page: { id, title, isPublic, size, subdomain, cover, description } });
   });
 
   api.delete("/pages/:id", async (c) => {
@@ -168,6 +198,7 @@ export function createApi(getAuth: (env: Env) => Auth) {
     if (!row || row.userId !== user.id) return c.json({ error: "not found" }, 404);
 
     await deleteHtml(c.env, row.path);
+    if (row.cover) await deleteCover(c.env, row.cover);
     await db.delete(schema.page).where(eq(schema.page.id, id));
     return c.json({ ok: true });
   });
