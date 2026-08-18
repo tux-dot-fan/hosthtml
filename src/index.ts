@@ -114,12 +114,13 @@ app.get("/", async (c) => {
       })),
       page,
       totalPages,
+      lang: c.req.query("lang") === "zh" ? "zh" : "en",
     }),
   );
 });
 
-app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
-app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
+app.get("/app", (c) => c.html(renderApp({ path: "/app", lang: c.req.query("lang") === "zh" ? "zh" : "en" })));
+app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor", lang: c.req.query("lang") === "zh" ? "zh" : "en" })));
 
 // --- Cover image: served from R2 (page id -> its cover). ---
 app.get("/covers/:id", async (c) => {

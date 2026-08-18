@@ -6,6 +6,48 @@ export const CLIENT_JS = `// HostHTML app shell: login / pages list / create / e
 const root = document.getElementById("root");
 const toastEl = document.getElementById("toast");
 
+// --- i18n (driven by ?lang=zh, falls back to English) ---
+const LANG = new URLSearchParams(location.search).get("lang") === "zh" ? "zh" : "en";
+const I18N = {
+  en: {
+    loginTitle: "Sign in", loginSub: "Sign in with Google to host and manage your HTML pages.",
+    loginGoogle: "Continue with Google",
+    myPages: "My Pages", newUpload: "⬆ Upload", newBlank: "+ Blank", signOut: "Sign out",
+    noPages: "No pages yet. Click upload or blank to create one.", loading: "Loading…",
+    pub: "🌍 Public", priv: "🔒 Private", open: "Open ↗",
+    actEdit: "✏️ Edit", actView: "👁 Open", actPub: "🌍 Publish", actPriv: "🔒 Make private",
+    delConfirm: "Delete this page?", error: "Error: ", noTitle: "Page title?",
+    editorTitle: "Edit · ", save: "💾 Save", back: "← Back",
+    subLabel: "Custom URL", subPlaceholder: "my-page", subCopy: "📋 Copy",
+    descLabel: "Description", descPlaceholder: "Short description (shown on home cards)",
+    coverLabel: "Cover", coverUpload: "🖼 Upload cover", coverRemove: "✕ Remove",
+    coverReady: "Cover ready — save to apply 🖼", copied: "Link copied 📋",
+    pubNotYet: " (not public — will be accessible after publishing)",
+    saved: "Saved 💾", saveFailed: "Save failed: ", loadFailed: "Error loading page: ",
+    uploadTooBig: "File too big (limit 2MB)", uploaded: "Uploaded, opening editor ✏️", uploadFailed: "Upload failed: ",
+    coverFailed: "Cover processing failed: ", saveCoverErr: "Cover ready",
+  },
+  zh: {
+    loginTitle: "登录", loginSub: "使用 Google 登录，托管和管理你的 HTML 页面。",
+    loginGoogle: "使用 Google 继续",
+    myPages: "我的页面", newUpload: "⬆ 上传", newBlank: "+ 空白", signOut: "退出登录",
+    noPages: "还没有页面。点击上传或空白创建。", loading: "加载中…",
+    pub: "🌍 公开", priv: "🔒 私有", open: "打开 ↗",
+    actEdit: "✏️ 编辑", actView: "👁 打开", actPub: "🌍 发布", actPriv: "🔒 设为私有",
+    delConfirm: "删除此页面？", error: "错误：", noTitle: "页面标题？",
+    editorTitle: "编辑 · ", save: "💾 保存", back: "← 返回",
+    subLabel: "专属网址", subPlaceholder: "my-page", subCopy: "📋 复制",
+    descLabel: "描述", descPlaceholder: "简短描述（首页卡片显示）",
+    coverLabel: "封面", coverUpload: "🖼 上传封面", coverRemove: "✕ 移除",
+    coverReady: "封面已就绪，保存后生效 🖼", copied: "已复制链接 📋",
+    pubNotYet: "（未公开，发布后才可访问）",
+    saved: "已保存 💾", saveFailed: "保存失败：", loadFailed: "页面加载失败：",
+    uploadTooBig: "文件太大（上限 2MB）", uploaded: "已上传，打开编辑器 ✏️", uploadFailed: "上传失败：",
+    coverFailed: "封面处理失败：", saveCoverErr: "封面已就绪",
+  },
+}[LANG];
+const t = I18N;
+
 const escapeHtml = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
@@ -86,7 +128,7 @@ async function signInWith(provider) {
     const res = await fetch("/api/auth/sign-in/social", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider, callbackURL: "/app" }),
+      body: JSON.stringify({ provider, callbackURL: "/app" + (LANG === "zh" ? "?lang=zh" : "") }),
       credentials: "include",
     });
     const data = await res.json();
@@ -104,8 +146,8 @@ function renderLogin(error = null) {
   const errBlock = error ? \`<p class="muted" style="color:#ef4444">⚠ \${escapeHtml(error)}</p>\` : "";
   root.innerHTML = \`
     <section class="card login-box">
-      <h2>Sign in</h2>
-      <p class="muted">Sign in with Google to host and manage your HTML pages.</p>
+      <h2>\${t.loginTitle}</h2>
+      <p class="muted">\${t.loginSub}</p>
       \${errBlock}
       <div style="margin-top:14px;">
         <button id="sign-in-google" class="provider-btn" style="width:100%;">
@@ -115,7 +157,7 @@ function renderLogin(error = null) {
             <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.1 0-9.5-3.3-11.2-7.9l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C41.4 35.7 44 30.4 44 24c0-1.3-.1-2.4-.4-3.5z"/>
           </svg>
-          Continue with Google
+          \${t.loginGoogle}
         </button>
       </div>
     </section>\`;
@@ -125,11 +167,11 @@ function renderLogin(error = null) {
 function renderShell(user) {
   root.innerHTML = \`
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">My Pages</h2>
+      <h2 style="margin:0;">\${t.myPages}</h2>
       <div class="row">
-        <button id="upload-page" class="btn" style="padding:8px 14px;">⬆ 上传</button>
-        <button id="blank-page" class="btn ghost" style="padding:8px 14px;">+ 空白</button>
-        <button id="sign-out" class="btn ghost" style="padding:8px 14px;">Sign out</button>
+        <button id="upload-page" class="btn" style="padding:8px 14px;">\${t.newUpload}</button>
+        <button id="blank-page" class="btn ghost" style="padding:8px 14px;">\${t.newBlank}</button>
+        <button id="sign-out" class="btn ghost" style="padding:8px 14px;">\${t.signOut}</button>
       </div>
     </div>
     <p class="muted">\${escapeHtml(user.email)}</p>
@@ -145,11 +187,11 @@ function renderShell(user) {
 
 async function loadPages() {
   const list = document.getElementById("page-list");
-  list.innerHTML = \`<li class="muted">Loading…</li>\`;
+  list.innerHTML = \`<li class="muted">\${t.loading}</li>\`;
   try {
     const { pages } = await api("/api/pages");
     if (!pages.length) {
-      list.innerHTML = \`<li class="muted">No pages yet. Click "+ New" to create one.</li>\`;
+      list.innerHTML = \`<li class="muted">\${t.noPages}</li>\`;
       return;
     }
     list.innerHTML = pages
@@ -159,16 +201,16 @@ async function loadPages() {
           <div>
             <a href="#" data-id="\${p.id}" class="page-title">\${escapeHtml(p.title)}</a>
             <div class="muted" style="font-size:12px;">
-              <span class="vis \${p.isPublic ? "pub" : "priv"}">\${p.isPublic ? "🌍 Public" : "🔒 Private"}</span>
+              <span class="vis \${p.isPublic ? "pub" : "priv"}">\${p.isPublic ? t.pub : t.priv}</span>
               \${fmtSize(p.size)} · \${new Date(p.updatedAt).toLocaleString()}
-              \${p.isPublic ? \` · <a href="/p/\${p.id}" target="_blank">open ↗</a>\` : ""}
+              \${p.isPublic ? \` · <a href="/p/\${p.id}" target="_blank">\${t.open}</a>\` : ""}
               \${p.isPublic && p.subdomain ? \` · <a href="https://\${escapeHtml(p.subdomain)}.hosthtml.online" target="_blank">\${escapeHtml(p.subdomain)}.hosthtml.online ↗</a>\` : ""}
             </div>
           </div>
           <div class="page-actions">
-            <button class="edit" data-id="\${p.id}">✏️ Edit</button>
-            <button class="view" data-id="\${p.id}">👁 Open</button>
-            <button class="pub-toggle" data-id="\${p.id}" data-pub="\${p.isPublic}">\${p.isPublic ? "🔒 Make private" : "🌍 Publish"}</button>
+            <button class="edit" data-id="\${p.id}">\${t.actEdit}</button>
+            <button class="view" data-id="\${p.id}">\${t.actView}</button>
+            <button class="pub-toggle" data-id="\${p.id}" data-pub="\${p.isPublic}">\${p.isPublic ? t.actPriv : t.actPub}</button>
             <button class="del" data-id="\${p.id}">🗑</button>
           </div>
         </li>\`,
@@ -189,23 +231,23 @@ async function loadPages() {
         const isPublic = b.dataset.pub === "true" ? false : true;
         try {
           await api(\`/api/pages/\${b.dataset.id}\`, { method: "PUT", body: JSON.stringify({ isPublic }) });
-          toast(isPublic ? "Published 🌍" : "Made private 🔒");
+          toast(isPublic ? (LANG === "zh" ? "已发布 🌍" : "Published 🌍") : (LANG === "zh" ? "已设为私有 🔒" : "Made private 🔒"));
           loadPages();
-        } catch (err) { toast("Failed: " + err.message); }
+        } catch (err) { toast(t.error + err.message); }
       };
     });
     list.querySelectorAll(".del").forEach((b) => {
       b.onclick = async () => {
-        if (!confirm("Delete this page?")) return;
+        if (!confirm(t.delConfirm)) return;
         try {
           await api(\`/api/pages/\${b.dataset.id}\`, { method: "DELETE" });
-          toast("Deleted");
+          toast(LANG === "zh" ? "已删除" : "Deleted");
           loadPages();
-        } catch (err) { toast("Failed: " + err.message); }
+        } catch (err) { toast(t.error + err.message); }
       };
     });
   } catch (err) {
-    list.innerHTML = \`<li>Error: \${escapeHtml(err.message)}</li>\`;
+    list.innerHTML = \`<li>\${t.error} \${escapeHtml(err.message)}</li>\`;
   }
 }
 
@@ -217,7 +259,7 @@ function uploadPage() {
   input.onchange = async () => {
     const file = input.files && input.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast("文件太大（上限 2MB）"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast(t.uploadTooBig); return; }
     const content = await file.text();
     const title = file.name.replace(/\\.(html?)$/i, "") || "Untitled";
     // Auto-extract description + cover image from the HTML.
@@ -242,24 +284,24 @@ function uploadPage() {
         body: JSON.stringify({ title, content, description, cover: coverData || undefined }),
         timeout: 60000,
       });
-      toast("已上传，打开编辑器 ✏️");
-      location.href = "/app/editor?pageId=" + page.id;
-    } catch (err) { toast("上传失败: " + err.message); }
+      toast(t.uploaded);
+      location.href = "/app/editor?pageId=" + page.id + (LANG === "zh" ? "&lang=zh" : "");
+    } catch (err) { toast(t.uploadFailed + err.message); }
   };
   input.click();
 }
 
 // Create a blank page and open the editor.
 async function blankPage() {
-  const title = prompt("Page title?");
+  const title = prompt(t.noTitle);
   if (!title) return;
   try {
     const { page } = await api("/api/pages", {
       method: "POST",
       body: JSON.stringify({ title, content: "<!doctype html>\\n<html>\\n<head>\\n<meta charset=\\"utf-8\\" />\\n<title>" + title + "</title>\\n</head>\\n<body>\\n\\n</body>\\n</html>" }),
     });
-    location.href = "/app/editor?pageId=" + page.id;
-  } catch (err) { toast("Failed: " + err.message); }
+    location.href = "/app/editor?pageId=" + page.id + (LANG === "zh" ? "&lang=zh" : "");
+  } catch (err) { toast(t.error + err.message); }
 }
 
 // --- Editor view (loaded on /app/editor?pageId=...) ---
@@ -269,42 +311,42 @@ async function renderEditor(pageId) {
     const res = await api(\`/api/pages/\${pageId}\`, { timeout: 30000 });
     page = res.page;
   } catch (err) {
-    root.innerHTML = \`<p>Error loading page: \${escapeHtml(err.message)}</p>\`;
+    root.innerHTML = \`<p>\${t.loadFailed} \${escapeHtml(err.message)}</p>\`;
     return;
   }
   root.innerHTML = \`
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Edit · \${escapeHtml(page.title)}</h2>
+      <h2 style="margin:0;">\${t.editorTitle}\${escapeHtml(page.title)}</h2>
       <div class="row">
-        <button id="ed-open" class="btn ghost" style="padding:8px 14px;">Open ↗</button>
-        <button id="ed-back" class="btn ghost" style="padding:8px 14px;">← Back</button>
-        <button id="ed-save" class="btn" style="padding:8px 14px;">💾 Save</button>
+        <button id="ed-open" class="btn ghost" style="padding:8px 14px;">\${t.open}</button>
+        <button id="ed-back" class="btn ghost" style="padding:8px 14px;">\${t.back}</button>
+        <button id="ed-save" class="btn" style="padding:8px 14px;">\${t.save}</button>
       </div>
     </div>
     <div class="muted" style="margin-bottom:10px;">
-      <span class="vis \${page.isPublic ? "pub" : "priv"}">\${page.isPublic ? "🌍 Public" : "🔒 Private"}</span>
-      <label style="margin-left:12px;"><input type="checkbox" id="ed-pub" \${page.isPublic ? "checked" : ""} /> Public</label>
+      <span class="vis \${page.isPublic ? "pub" : "priv"}">\${page.isPublic ? t.pub : t.priv}</span>
+      <label style="margin-left:12px;"><input type="checkbox" id="ed-pub" \${page.isPublic ? "checked" : ""} /> \${LANG === "zh" ? "公开" : "Public"}</label>
     </div>
     <div class="muted" style="margin-bottom:12px;">
-      <label>专属网址：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="my-page" /> .hosthtml.online</label>
-      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">📋 复制</button>
+      <label>\${t.subLabel}：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="\${t.subPlaceholder}" /> .hosthtml.online</label>
+      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.subCopy}</button>
     </div>
     <div class="muted" style="margin-bottom:12px;">
-      <label>描述：<input id="ed-desc" style="width:70%;" value="\${escapeHtml(page.description || "")}" placeholder="简短描述（首页卡片显示）" maxlength="200" /></label>
+      <label>\${t.descLabel}：<input id="ed-desc" style="width:70%;" value="\${escapeHtml(page.description || "")}" placeholder="\${t.descPlaceholder}" maxlength="200" /></label>
     </div>
     <div class="muted" style="margin-bottom:12px; display:flex; align-items:center; gap:12px;">
-      <span>封面：</span>
+      <span>\${t.coverLabel}：</span>
       <img id="ed-cover-preview" style="width:120px; height:68px; object-fit:cover; border-radius:8px; border:1px solid var(--border); \${page.cover ? "" : "display:none;"}" src="/covers/\${page.id}" alt="" />
-      <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">🖼 上传封面</button>
-      <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; \${page.cover ? "" : "display:none;"}">✕ 移除</button>
+      <button id="ed-cover-pick" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">\${t.coverUpload}</button>
+      <button id="ed-cover-remove" style="padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:#f85149; cursor:pointer; \${page.cover ? "" : "display:none;"}">\${t.coverRemove}</button>
     </div>
     <textarea id="ed-content" spellcheck="false">\${escapeHtml(page.content || "")}</textarea>\`;
   document.getElementById("ed-copy-sub").onclick = () => {
     const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
     const url = sub ? "https://" + sub + ".hosthtml.online" : window.location.origin + "/p/" + pageId;
-    const text = page.isPublic ? url : url + " (页面未公开，公开后才可访问)";
+    const text = page.isPublic ? url : url + t.pubNotYet;
     if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(() => toast("已复制链接 📋")).catch(() => toast(text));
+      navigator.clipboard.writeText(text).then(() => toast(t.copied)).catch(() => toast(text));
     } else {
       toast(text);
     }
@@ -319,11 +361,11 @@ async function renderEditor(pageId) {
       const f = input.files && input.files[0];
       if (!f) return;
       try { coverDataUrl = await compressImage(f); }
-      catch (e) { toast("封面处理失败: " + e.message); return; }
+      catch (e) { toast(t.coverFailed + e.message); return; }
       const img = document.getElementById("ed-cover-preview");
       img.src = coverDataUrl; img.style.display = "";
       document.getElementById("ed-cover-remove").style.display = "";
-      toast("封面已就绪，保存时生效 🖼");
+      toast(t.coverReady);
     };
     input.click();
   };
@@ -344,12 +386,12 @@ async function renderEditor(pageId) {
     if (coverDataUrl !== null) payload.cover = coverDataUrl; // new data URL or '' to remove
     try {
       await api(\`/api/pages/\${pageId}\`, { method: "PUT", body: JSON.stringify(payload), timeout: 60000 });
-      toast("Saved 💾");
+      toast(t.saved);
       coverDataUrl = null;
-    } catch (err) { toast("Save failed: " + err.message); }
+    } catch (err) { toast(t.saveFailed + err.message); }
   };
   document.getElementById("ed-open").onclick = () => { location.href = "/p/" + pageId; };
-  document.getElementById("ed-back").onclick = () => { location.href = "/app"; };
+  document.getElementById("ed-back").onclick = () => { location.href = "/app" + (LANG === "zh" ? "?lang=zh" : ""); };
   // Ctrl/Cmd+S to save
   document.getElementById("ed-content").addEventListener("keydown", (e) => {
     if (e.key === "s" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById("ed-save").click(); }
@@ -405,6 +447,53 @@ const esc = (s: string): string =>
 // --- SEO ---
 export const SITE_URL = "https://hosthtml.online";
 export const SITE_NAME = "HostHTML";
+
+// --- i18n ---
+const LANG_EN = {
+  htmlLang: "en",
+  navManage: "My Pages",
+  heroTagline:
+    "Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.",
+  heroCta: "Sign in to upload / manage →",
+  pubTitle: "Recently published",
+  pubEmpty: "No public pages yet. Sign in and publish your first HTML page.",
+  prev: "← Prev",
+  next: "Next →",
+  fSubdomainT: "Your own subdomain",
+  fSubdomainD: "Every public page gets a unique address like my-page.hosthtml.online. Share it anywhere.",
+  fPrivT: "Private or public",
+  fPrivD: "Keep pages private for yourself, or publish them publicly with one click. Private pages are never served.",
+  fEditT: "Edit in the browser",
+  fEditD: "Edit your HTML right in the app with a source editor. Ctrl/Cmd+S to save, instant updates.",
+  fNoServerT: "No server setup",
+  fNoServerD: "Hosted on Cloudflare's global edge. No servers to manage, no builds, just upload and go.",
+  appTitle: "HostHTML App · Manage Your Hosted HTML Pages",
+  appDesc: "Sign in and manage your hosted HTML pages on HostHTML: create, edit, publish or make pages private.",
+  appLoading: "Loading…",
+  dateLocale: "en-US",
+};
+const LANG_ZH: typeof LANG_EN = {
+  htmlLang: "zh-CN",
+  navManage: "我的页面",
+  heroTagline: "上传、编辑和分享 HTML 页面。用 Google 登录，页面可设为私有或公开，任何浏览器都能打开。",
+  heroCta: "登录后上传 / 管理 →",
+  pubTitle: "最新发布",
+  pubEmpty: "还没有公开页面。登录并发布你的第一个 HTML 页面吧。",
+  prev: "← 上一页",
+  next: "下一页 →",
+  fSubdomainT: "专属子域名",
+  fSubdomainD: "每个公开页面都有专属地址，如 my-page.hosthtml.online。随处分享。",
+  fPrivT: "私有或公开",
+  fPrivD: "页面可设为仅自己可见，也可一键公开分享。私有页面永不被访问。",
+  fEditT: "浏览器内编辑",
+  fEditD: "在应用内用源码编辑器直接编辑 HTML。Ctrl/Cmd+S 保存，即时生效。",
+  fNoServerT: "无需服务器",
+  fNoServerD: "托管在 Cloudflare 全球边缘。无需管理服务器、无需构建，上传即用。",
+  appTitle: "HostHTML 应用 · 管理你的托管页面",
+  appDesc: "登录 HostHTML 管理你的托管 HTML 页面：创建、编辑、发布或设为私有。",
+  appLoading: "加载中…",
+  dateLocale: "zh-CN",
+};
 
 const SEO_KEYWORDS =
   "html hosting, free html hosting, host html page, share html online, html editor online, publish html, html web hosting, online html host, static html hosting, hosthtml";
@@ -519,25 +608,31 @@ const BASE_CSS = `
 
 export interface AppProps {
   path: string;
+  lang?: string;
 }
 
-const NAVBAR = `
+function NAVBAR(isZh: boolean): string {
+  const L = isZh ? LANG_ZH : LANG_EN;
+  return `
   <div class="nav-wrap">
     <nav>
       <a href="/" class="brand"><span class="logo">&lt;/&gt;</span> HostHTML</a>
       <div class="center"></div>
       <div class="right">
-        <a class="btn ghost" href="/app">⬆ 我的页面</a>
+        <a class="btn ghost" href="/app${isZh ? "?lang=zh" : ""}">⬆ ${L.navManage}</a>
       </div>
     </nav>
   </div>`;
+}
 
 /** Generic app shell — the client app.js decides login vs dashboard. */
 export function renderApp(props: AppProps): string {
-  const title = "HostHTML App · Manage Your Hosted HTML Pages";
-  const desc = "Sign in and manage your hosted HTML pages on HostHTML: create, edit, publish or make pages private.";
+  const isZh = props.lang === "zh";
+  const L = isZh ? LANG_ZH : LANG_EN;
+  const title = L.appTitle;
+  const desc = L.appDesc;
   return `<!doctype html>
-<html lang="en">
+<html lang="${L.htmlLang}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -560,8 +655,8 @@ ${BASE_CSS}
 </style>
 </head>
 <body>
-  ${NAVBAR}
-  <main id="root" class="wrap">Loading…</main>
+  ${NAVBAR(isZh)}
+  <main id="root" class="wrap">${L.appLoading}</main>
   <div class="toast" id="toast"></div>
   <script>${CLIENT_JS}</script>
 </body>
@@ -578,10 +673,15 @@ export interface PublicPage {
 }
 
 /** Landing page. */
-export function renderLanding(opts: { pages: PublicPage[]; page: number; totalPages: number } = { pages: [], page: 1, totalPages: 1 }): string {
-  const title = "HostHTML · Free HTML Hosting, Editor & Sharing";
-  const desc =
-    "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
+export function renderLanding(
+  opts: { pages: PublicPage[]; page: number; totalPages: number; lang?: string } = { pages: [], page: 1, totalPages: 1 },
+): string {
+  const isZh = opts.lang === "zh";
+  const L = isZh ? LANG_ZH : LANG_EN;
+  const title = isZh ? "HostHTML · 免费 HTML 托管、编辑与分享" : "HostHTML · Free HTML Hosting, Editor & Sharing";
+  const desc = isZh
+    ? "免费 HTML 托管与分享。在线上传、编辑、发布 HTML 页面，可设为私有或公开分享给任何人。无需服务器，任何浏览器都能打开。"
+    : "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
 
   // Paginated list of recently published pages, shown as cards.
   const listItems = opts.pages.length
@@ -594,28 +694,28 @@ export function renderLanding(opts: { pages: PublicPage[]; page: number; totalPa
             <div class="pub-card-body">
               <div class="pub-card-title">${esc(p.title) || "(untitled)"}</div>
               ${p.description ? `<div class="pub-card-desc">${esc(p.description)}</div>` : ""}
-              <div class="pub-card-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString()}</div>
+              <div class="pub-card-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString(L.dateLocale)}</div>
             </div>
           </a>
         </li>`,
         )
         .join("")
-    : `<li class="empty">No public pages yet. Sign in and publish your first HTML page.</li>`;
+    : `<li class="empty">${L.pubEmpty}</li>`;
 
   // Pagination controls.
   let pager = "";
   if (opts.totalPages > 1) {
-    const prevHref = opts.page > 1 ? `/?page=${opts.page - 1}` : null;
-    const nextHref = opts.page < opts.totalPages ? `/?page=${opts.page + 1}` : null;
+    const prevHref = opts.page > 1 ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page - 1}` : null;
+    const nextHref = opts.page < opts.totalPages ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page + 1}` : null;
     pager = `<div class="pager">
-      ${prevHref ? `<a class="pg" href="${prevHref}">← Prev</a>` : `<span class="pg off">← Prev</span>`}
+      ${prevHref ? `<a class="pg" href="${prevHref}">${L.prev}</a>` : `<span class="pg off">${L.prev}</span>`}
       <span class="pg-now">${opts.page} / ${opts.totalPages}</span>
-      ${nextHref ? `<a class="pg" href="${nextHref}">Next →</a>` : `<span class="pg off">Next →</span>`}
+      ${nextHref ? `<a class="pg" href="${nextHref}">${L.next}</a>` : `<span class="pg off">${L.next}</span>`}
     </div>`;
   }
 
   return `<!doctype html>
-<html lang="en">
+<html lang="${L.htmlLang}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -629,16 +729,16 @@ ${BASE_CSS}
 </style>
 </head>
 <body>
-  ${NAVBAR}
+  ${NAVBAR(isZh)}
   <main class="wrap">
     <section class="hero">
       <h1>HostHTML</h1>
-      <p>Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.</p>
-      <a class="btn" href="/app">⬆ 上传 / 管理我的页面 →</a>
+      <p>${L.heroTagline}</p>
+      <a class="btn" href="/app${isZh ? "?lang=zh" : ""}">${L.heroCta}</a>
     </section>
 
     <section class="pub-section">
-      <h2>Recently published</h2>
+      <h2>${L.pubTitle}</h2>
       <ul class="pub-list">${listItems}</ul>
       ${pager}
     </section>
@@ -646,23 +746,23 @@ ${BASE_CSS}
     <section class="features">
       <div class="feature">
         <div class="icon">🌐</div>
-        <h3>Your own subdomain</h3>
-        <p>Every public page gets a unique address like <span class="subdomain-demo">my-page.hosthtml.online</span>. Share it anywhere.</p>
+        <h3>${L.fSubdomainT}</h3>
+        <p>${L.fSubdomainD}</p>
       </div>
       <div class="feature">
         <div class="icon">🔒</div>
-        <h3>Private or public</h3>
-        <p>Keep pages private for yourself, or publish them publicly with one click. Private pages are never served.</p>
+        <h3>${L.fPrivT}</h3>
+        <p>${L.fPrivD}</p>
       </div>
       <div class="feature">
         <div class="icon">✏️</div>
-        <h3>Edit in the browser</h3>
-        <p>Edit your HTML right in the app with a source editor. Ctrl/Cmd+S to save, instant updates.</p>
+        <h3>${L.fEditT}</h3>
+        <p>${L.fEditD}</p>
       </div>
       <div class="feature">
         <div class="icon">🚀</div>
-        <h3>No server setup</h3>
-        <p>Hosted on Cloudflare's global edge. No servers to manage, no builds, just upload and go.</p>
+        <h3>${L.fNoServerT}</h3>
+        <p>${L.fNoServerD}</p>
       </div>
     </section>
   </main>
