@@ -59,17 +59,15 @@ app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
 
 // --- Subdomain hosting: <sub>.hosthtml.online serves a user's page ---
-// Any subdomain of the site (e.g. my-page.hosthtml.online) maps to the page
-// with subdomain = "my-page". The page must be public; otherwise 404.
-app.get("*", async (c) => {
+// This is a middleware, not a catch-all GET route: it only intercepts requests
+// whose host is a real subdomain (e.g. my-page.hosthtml.online). For any other
+// host it falls through to the normal routes (/, /app, /p/:id, /api, ...).
+app.use("*", async (c, next) => {
   const host = c.req.header("host") || "";
-  // Only handle requests that are actually subdomains of the site, e.g.
-  // my-page.hosthtml.online. The bare domain (hosthtml.online) and any other
-  // host should not be treated as a page subdomain.
-  if (!host.endsWith(".hosthtml.online")) return c.notFound();
+  if (!host.endsWith(".hosthtml.online")) return next(); // bare domain — normal routes
   const prefix = host.slice(0, -".hosthtml.online".length);
-  // Skip reserved prefixes that are app routes on the bare domain.
-  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return c.notFound();
+  // Reserved prefixes must NOT be treated as page subdomains.
+  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return next();
 
   const db = getDb(c.env);
   const row = await db
