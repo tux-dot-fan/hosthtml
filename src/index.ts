@@ -31,6 +31,35 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+// --- Subdomain hosting: <sub>.hosthtml.online serves a user's page ---
+// MUST be registered before the concrete routes (/, /app, /p/:id, ...), else
+// a request to the subdomain's "/" path would match the landing route first
+// and the subdomain would never be resolved. This middleware intercepts only
+// requests whose host is a real subdomain of hosthtml.online; anything else
+// falls through to the normal routes.
+app.use("*", async (c, next) => {
+  const host = c.req.header("host") || "";
+  if (!host.endsWith(".hosthtml.online")) return next(); // bare domain — normal routes
+  const prefix = host.slice(0, -".hosthtml.online".length);
+  // Reserved prefixes must NOT be treated as page subdomains.
+  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return next();
+
+  const db = getDb(c.env);
+  const row = await db
+    .select()
+    .from(schema.page)
+    .where(eq(schema.page.subdomain, prefix))
+    .get();
+  if (!row || !row.isPublic) {
+    return c.html(
+      "<!doctype html><html><head><meta charset='utf-8'/><title>Not found</title></head><body style='font-family:sans-serif;text-align:center;padding:60px 20px'><h1>404</h1><p>This page does not exist or is private.</p><p><a href='https://hosthtml.online/'>← HostHTML</a></p></body></html>",
+      404,
+    );
+  }
+  const html = (await getHtml(c.env, row.path)) ?? "<h1>(empty)</h1>";
+  return c.html(html);
+});
+
 // --- Health check ---
 app.get("/healthz", (c) =>
   c.json({
@@ -57,33 +86,6 @@ app.get("/", (c) => c.html(renderLanding()));
 
 app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
-
-// --- Subdomain hosting: <sub>.hosthtml.online serves a user's page ---
-// This is a middleware, not a catch-all GET route: it only intercepts requests
-// whose host is a real subdomain (e.g. my-page.hosthtml.online). For any other
-// host it falls through to the normal routes (/, /app, /p/:id, /api, ...).
-app.use("*", async (c, next) => {
-  const host = c.req.header("host") || "";
-  if (!host.endsWith(".hosthtml.online")) return next(); // bare domain — normal routes
-  const prefix = host.slice(0, -".hosthtml.online".length);
-  // Reserved prefixes must NOT be treated as page subdomains.
-  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return next();
-
-  const db = getDb(c.env);
-  const row = await db
-    .select()
-    .from(schema.page)
-    .where(eq(schema.page.subdomain, prefix))
-    .get();
-  if (!row || !row.isPublic) {
-    return c.html(
-      "<!doctype html><html><head><meta charset='utf-8'/><title>Not found</title></head><body style='font-family:sans-serif;text-align:center;padding:60px 20px'><h1>404</h1><p>This page does not exist or is private.</p><p><a href='https://hosthtml.online/'>← HostHTML</a></p></body></html>",
-      404,
-    );
-  }
-  const html = (await getHtml(c.env, row.path)) ?? "<h1>(empty)</h1>";
-  return c.html(html);
-});
 
 // --- Public open page: serve the hosted HTML directly if public ---
 // If the page is private, we return a minimal 404-ish HTML instead of leaking.
