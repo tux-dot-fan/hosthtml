@@ -211,8 +211,19 @@ async function renderEditor(pageId) {
     </div>
     <div class="muted" style="margin-bottom:12px;">
       <label>专属网址：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="my-page" /> .hosthtml.online</label>
+      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">📋 复制</button>
     </div>
     <textarea id="ed-content" spellcheck="false">\${escapeHtml(page.content || "")}</textarea>\`;
+  document.getElementById("ed-copy-sub").onclick = () => {
+    const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const url = sub ? "https://" + sub + ".hosthtml.online" : window.location.origin + "/p/" + pageId;
+    const text = page.isPublic ? url : url + " (页面未公开，公开后才可访问)";
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast("已复制链接 📋")).catch(() => toast(text));
+    } else {
+      toast(text);
+    }
+  };
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
@@ -363,6 +374,12 @@ const BASE_CSS = `
   .login-box { max-width: 380px; margin: 40px auto; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #161b22; color: #e6edf3; padding: 12px 20px; border-radius: 10px; font-size: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.4); display: none; z-index: 100; }
   .toast.show { display: block; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 30px; }
+  .feature { border: 1px solid var(--border); border-radius: 14px; padding: 22px; background: var(--bg-elev); }
+  .feature h3 { margin: 0 0 8px; font-size: 17px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+  .feature .icon { font-size: 22px; margin-bottom: 10px; }
+  .subdomain-demo { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-soft); border-radius: 8px; padding: 3px 10px; font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
   @media (max-width: 640px) { .hero h1 { font-size: 30px; } ul.pages li { flex-direction: column; align-items: flex-start; } }
 `;
 
@@ -443,6 +460,29 @@ ${BASE_CSS}
       <h1>HostHTML</h1>
       <p>Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.</p>
       <a class="btn" href="/app">Open app →</a>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <div class="icon">🌐</div>
+        <h3>Your own subdomain</h3>
+        <p>Every public page gets a unique address like <span class="subdomain-demo">my-page.hosthtml.online</span>. Share it anywhere.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🔒</div>
+        <h3>Private or public</h3>
+        <p>Keep pages private for yourself, or publish them publicly with one click. Private pages are never served.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">✏️</div>
+        <h3>Edit in the browser</h3>
+        <p>Edit your HTML right in the app with a source editor. Ctrl/Cmd+S to save, instant updates.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🚀</div>
+        <h3>No server setup</h3>
+        <p>Hosted on Cloudflare's global edge. No servers to manage, no builds, just upload and go.</p>
+      </div>
     </section>
   </main>
   <script>${CLIENT_JS}</script>

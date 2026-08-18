@@ -207,8 +207,19 @@ async function renderEditor(pageId) {
     </div>
     <div class="muted" style="margin-bottom:12px;">
       <label>专属网址：<input id="ed-sub" style="width:220px;" value="${escapeHtml(page.subdomain || "")}" placeholder="my-page" /> .hosthtml.online</label>
+      <button id="ed-copy-sub" style="margin-left:8px; padding:5px 11px; font-size:12.5px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer;">📋 复制</button>
     </div>
     <textarea id="ed-content" spellcheck="false">${escapeHtml(page.content || "")}</textarea>`;
+  document.getElementById("ed-copy-sub").onclick = () => {
+    const sub = (document.getElementById("ed-sub").value.trim() || "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const url = sub ? "https://" + sub + ".hosthtml.online" : window.location.origin + "/p/" + pageId;
+    const text = page.isPublic ? url : url + " (页面未公开，公开后才可访问)";
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast("已复制链接 📋")).catch(() => toast(text));
+    } else {
+      toast(text);
+    }
+  };
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
