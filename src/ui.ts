@@ -495,6 +495,23 @@ const LANG_ZH: typeof LANG_EN = {
   dateLocale: "zh-CN",
 };
 
+// Redirect to the persisted language (localStorage "hh-lang") if the current
+// URL doesn't carry a ?lang= override and the persisted language differs from
+// the server-rendered one. Runs early in <head> to avoid a flash.
+const LANG_REDIRECT_JS = `(function () {
+  try {
+    var saved = localStorage.getItem("hh-lang");
+    if (saved !== "zh" && saved !== "en") return;
+    var params = new URLSearchParams(location.search);
+    if (params.has("lang")) return; // explicit override wins
+    var cur = ${JSON.stringify("${IS_ZH}")} === "zh" ? "zh" : "en";
+    if (saved !== cur) {
+      params.set("lang", saved);
+      location.replace(location.pathname + "?" + params.toString());
+    }
+  } catch (e) {}
+})();`;
+
 const SEO_KEYWORDS =
   "html hosting, free html hosting, host html page, share html online, html editor online, publish html, html web hosting, online html host, static html hosting, hosthtml";
 
@@ -550,6 +567,8 @@ const BASE_CSS = `
   .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff !important; border: 0; border-radius: 9px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none !important; }
   .btn:hover { filter: brightness(1.08); }
   .btn.ghost { background: transparent; color: var(--text) !important; border: 1px solid var(--border); }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); font-size: 12.5px; font-weight: 600; cursor: pointer; text-decoration: none !important; transition: background .12s; }
+  .icon-btn:hover { background: var(--bg-soft); }
   .wrap { max-width: 860px; margin: 0 auto; padding: 32px 24px 60px; }
   .card { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg-elev); }
   .muted { opacity: .7; font-size: 13px; }
@@ -613,6 +632,7 @@ export interface AppProps {
 
 function NAVBAR(isZh: boolean): string {
   const L = isZh ? LANG_ZH : LANG_EN;
+  const other = isZh ? "en" : "zh";
   return `
   <div class="nav-wrap">
     <nav>
@@ -620,9 +640,25 @@ function NAVBAR(isZh: boolean): string {
       <div class="center"></div>
       <div class="right">
         <a class="btn ghost" href="/app${isZh ? "?lang=zh" : ""}">⬆ ${L.navManage}</a>
+        <a class="icon-btn lang-btn" id="lang-toggle" href="#" title="${other === "zh" ? "中文" : "English"}" aria-label="language">${isZh ? "EN" : "中文"}</a>
       </div>
     </nav>
-  </div>`;
+  </div>
+  <script>
+  (function () {
+    var btn = document.getElementById("lang-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      var to = ${JSON.stringify(other)};
+      try { localStorage.setItem("hh-lang", to); } catch (err) {}
+      var p = location.pathname;
+      var q = new URLSearchParams(location.search);
+      q.set("lang", to);
+      location.href = p + "?" + q.toString();
+    });
+  })();
+  </script>`;
 }
 
 /** Generic app shell — the client app.js decides login vs dashboard. */
@@ -650,6 +686,7 @@ ${seoMeta({ title, desc, path: props.path, type: "webapp" })}
   } catch (e) {}
 })();
 </script>
+<script>${LANG_REDIRECT_JS.replace(/\$\{IS_ZH\}/g, isZh ? "zh" : "en")}</script>
 <style>
 ${BASE_CSS}
 </style>
@@ -724,6 +761,7 @@ export function renderLanding(
 ${seoMeta({ title, desc, path: "/" })}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M20 20h24v6H26v6h14v6H26v6h18v6H20z' fill='%23fff'/%3E%3C/svg%3E" />
 ${JSONLD_WEBSITE}
+<script>${LANG_REDIRECT_JS.replace(/\$\{IS_ZH\}/g, isZh ? "zh" : "en")}</script>
 <style>
 ${BASE_CSS}
 </style>
