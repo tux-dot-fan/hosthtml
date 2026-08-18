@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, or, and, like } from "drizzle-orm";
 import type { Env } from "./env";
 import { createAuth } from "./auth";
 import { createApi } from "./routes/api";
@@ -146,11 +146,17 @@ app.get("/", async (c) => {
   const perPage = 30;
   const page = Math.max(1, parseInt(c.req.query("page") || "1", 10) || 1);
   const offset = (page - 1) * perPage;
+  const q = (c.req.query("q") || "").trim().slice(0, 60);
   const db = getDb(c.env);
+  // Optional search on title OR description (case-insensitive via LIKE).
+  const searchCond = q
+    ? or(like(schema.page.title, `%${q}%`), like(schema.page.description, `%${q}%`))
+    : undefined;
+  const baseWhere = eq(schema.page.isPublic, true);
   const rows = await db
     .select()
     .from(schema.page)
-    .where(eq(schema.page.isPublic, true))
+    .where(searchCond ? and(baseWhere, searchCond) : baseWhere)
     .orderBy(schema.page.updatedAt)
     .limit(perPage)
     .offset(offset)
@@ -158,7 +164,7 @@ app.get("/", async (c) => {
   const total = await db
     .select({ id: schema.page.id })
     .from(schema.page)
-    .where(eq(schema.page.isPublic, true))
+    .where(searchCond ? and(baseWhere, searchCond) : baseWhere)
     .all();
   const totalPages = Math.max(1, Math.ceil(total.length / perPage));
   return c.html(
@@ -174,6 +180,7 @@ app.get("/", async (c) => {
       })),
       page,
       totalPages,
+      q,
       lang: c.req.query("lang") === "zh" ? "zh" : "en",
     }),
   );

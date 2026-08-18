@@ -761,6 +761,11 @@ const BASE_CSS = `
   /* recently published cards */
   .pub-section { margin-top: 44px; }
   .pub-section h2 { font-size: 20px; margin: 0 0 14px; }
+  .pub-search { display: flex; gap: 8px; max-width: 460px; margin: 0 0 18px; }
+  .pub-search input { flex: 1; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); font-size: 14px; }
+  .pub-search input:focus { outline: none; border-color: var(--accent); }
+  .pub-search button { padding: 9px 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); font-size: 14px; cursor: pointer; }
+  .pub-search button:hover { background: var(--bg-soft); border-color: var(--accent); color: var(--accent); }
   .pub-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
   .pub-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev); transition: transform .12s, box-shadow .12s, border-color .12s; }
   .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); border-color: var(--accent); }
@@ -872,10 +877,11 @@ export interface PublicPage {
 
 /** Landing page. */
 export function renderLanding(
-  opts: { pages: PublicPage[]; page: number; totalPages: number; lang?: string } = { pages: [], page: 1, totalPages: 1 },
+  opts: { pages: PublicPage[]; page: number; totalPages: number; lang?: string; q?: string } = { pages: [], page: 1, totalPages: 1 },
 ): string {
   const isZh = opts.lang === "zh";
   const L = isZh ? LANG_ZH : LANG_EN;
+  const searchQuery = opts.q || "";
   const title = isZh ? "HostHTML.Online · 免费 HTML 托管、编辑与分享" : "HostHTML.Online · Free HTML Hosting, Editor & Sharing";
   const desc = isZh
     ? "免费 HTML 托管，把 HTML 变成你的网页工具、个人介绍页或落地页。上传即刻上线，自动获得专属子域名；可公开分享或设为私有，无需服务器，任何浏览器都能打开。"
@@ -903,17 +909,25 @@ export function renderLanding(
         .join("")
     : `<li class="empty">${L.pubEmpty}</li>`;
 
-  // Pagination controls.
+  // Pagination controls (keep the search query).
+  const qs = searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : "";
   let pager = "";
   if (opts.totalPages > 1) {
-    const prevHref = opts.page > 1 ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page - 1}` : null;
-    const nextHref = opts.page < opts.totalPages ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page + 1}` : null;
+    const prevHref = opts.page > 1 ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page - 1}${qs}` : null;
+    const nextHref = opts.page < opts.totalPages ? `/?lang=${isZh ? "zh" : "en"}&page=${opts.page + 1}${qs}` : null;
     pager = `<div class="pager">
       ${prevHref ? `<a class="pg" href="${prevHref}">${L.prev}</a>` : `<span class="pg off">${L.prev}</span>`}
       <span class="pg-now">${opts.page} / ${opts.totalPages}</span>
       ${nextHref ? `<a class="pg" href="${nextHref}">${L.next}</a>` : `<span class="pg off">${L.next}</span>`}
     </div>`;
   }
+
+  // Search box + result heading.
+  const searchBox = `<form class="pub-search" action="/" method="get">
+    <input type="hidden" name="lang" value="${isZh ? "zh" : "en"}" />
+    <input type="text" name="q" value="${esc(searchQuery)}" placeholder="${isZh ? "搜索公开页面名称或描述…" : "Search public pages by name or description…"}" />
+    <button type="submit">${isZh ? "搜索" : "Search"}</button>
+  </form>`;
 
   return `<!doctype html>
 <html lang="${L.htmlLang}">
@@ -940,7 +954,8 @@ ${BASE_CSS}
     </section>
 
     <section class="pub-section">
-      <h2>${L.pubTitle}</h2>
+      ${searchBox}
+      <h2>${searchQuery ? (isZh ? `搜索结果：${esc(searchQuery)}` : `Results for “${esc(searchQuery)}”`) : L.pubTitle}</h2>
       <ul class="pub-list">${listItems}</ul>
       ${pager}
     </section>
