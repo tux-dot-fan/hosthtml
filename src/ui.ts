@@ -479,7 +479,7 @@ const esc = (s: string): string =>
 
 // --- SEO ---
 export const SITE_URL = "https://hosthtml.online";
-export const SITE_NAME = "HostHTML";
+export const SITE_NAME = "hosthtml.online";
 
 // --- i18n ---
 const LANG_EN = {
@@ -500,8 +500,8 @@ const LANG_EN = {
   fEditD: "Edit your HTML right in the app with a source editor. Ctrl/Cmd+S to save, instant updates.",
   fNoServerT: "No server setup",
   fNoServerD: "Hosted on Cloudflare's global edge. No servers to manage, no builds, just upload and go.",
-  appTitle: "HostHTML App · Manage Your Hosted HTML Pages",
-  appDesc: "Sign in and manage your hosted HTML pages on HostHTML: create, edit, publish or make pages private.",
+  appTitle: "hosthtml.online · Manage Your Hosted HTML Pages",
+  appDesc: "Sign in and manage your hosted HTML pages on hosthtml.online: create, edit, publish or make pages private.",
   appLoading: "Loading…",
   dateLocale: "en-US",
 };
@@ -522,8 +522,8 @@ const LANG_ZH: typeof LANG_EN = {
   fEditD: "在应用内用源码编辑器直接编辑 HTML。Ctrl/Cmd+S 保存，即时生效。",
   fNoServerT: "无需服务器",
   fNoServerD: "托管在 Cloudflare 全球边缘。无需管理服务器、无需构建，上传即用。",
-  appTitle: "HostHTML 应用 · 管理你的托管页面",
-  appDesc: "登录 HostHTML 管理你的托管 HTML 页面：创建、编辑、发布或设为私有。",
+  appTitle: "hosthtml.online 应用 · 管理你的托管页面",
+  appDesc: "登录 hosthtml.online 管理你的托管 HTML 页面：创建、编辑、发布或设为私有。",
   appLoading: "加载中…",
   dateLocale: "zh-CN",
 };
@@ -572,7 +572,7 @@ const JSONLD_WEBSITE = `<script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "HostHTML",
+  "name": "hosthtml.online",
   "url": "${SITE_URL}",
   "description": "Free HTML hosting & sharing. Upload, edit and publish HTML pages; keep them private or public.",
   "potentialAction": {
@@ -685,7 +685,7 @@ function NAVBAR(isZh: boolean): string {
   return `
   <div class="nav-wrap">
     <nav>
-      <a href="/" class="brand"><span class="logo">&lt;/&gt;</span> HostHTML</a>
+      <a href="/" class="brand"><span class="logo">&lt;/&gt;</span> hosthtml.online</a>
       <div class="center"></div>
       <div class="right">
         <a class="btn ghost" href="/app${isZh ? "?lang=zh" : ""}">⬆ ${L.navManage}</a>
@@ -764,7 +764,7 @@ export function renderLanding(
 ): string {
   const isZh = opts.lang === "zh";
   const L = isZh ? LANG_ZH : LANG_EN;
-  const title = isZh ? "HostHTML · 免费 HTML 托管、编辑与分享" : "HostHTML · Free HTML Hosting, Editor & Sharing";
+  const title = isZh ? "hosthtml.online · 免费 HTML 托管、编辑与分享" : "hosthtml.online · Free HTML Hosting, Editor & Sharing";
   const desc = isZh
     ? "免费 HTML 托管与分享。在线上传、编辑、发布 HTML 页面，可设为私有或公开分享给任何人。无需服务器，任何浏览器都能打开。"
     : "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
@@ -819,7 +819,7 @@ ${BASE_CSS}
   ${NAVBAR(isZh)}
   <main class="wrap">
     <section class="hero">
-      <h1>HostHTML</h1>
+      <h1>hosthtml.online</h1>
       <p>${L.heroTagline}</p>
       <a class="btn" href="/app${isZh ? "?lang=zh" : ""}">${L.heroCta}</a>
     </section>
@@ -866,7 +866,7 @@ export function renderPublicShell(title: string): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${esc(title)} · HostHTML</title>
+<title>${esc(title)} · hosthtml.online</title>
 <script>${CLIENT_JS}</script>
 </head>
 <body>
