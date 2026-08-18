@@ -486,7 +486,7 @@ const LANG_EN = {
   htmlLang: "en",
   navManage: "My Pages",
   heroTagline:
-    "Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.",
+    "Make your own WebApp, personal page or landing page — just upload the HTML. Get it live instantly at your own subdomain, no server setup, no build step. Public or private, viewable in any browser.",
   heroCta: "Sign in to upload / manage →",
   pubTitle: "Recently published",
   pubEmpty: "No public pages yet. Sign in and publish your first HTML page.",
@@ -508,7 +508,7 @@ const LANG_EN = {
 const LANG_ZH: typeof LANG_EN = {
   htmlLang: "zh-CN",
   navManage: "我的页面",
-  heroTagline: "上传、编辑和分享 HTML 页面。用 Google 登录，页面可设为私有或公开，任何浏览器都能打开。",
+  heroTagline: "用它做你的网页工具、个人介绍页或落地页——上传 HTML 即刻上线，自动获得专属子域名。无需服务器、无需构建，公开或私有，任何浏览器都能打开。",
   heroCta: "登录后上传 / 管理 →",
   pubTitle: "最新发布",
   pubEmpty: "还没有公开页面。登录并发布你的第一个 HTML 页面吧。",
@@ -574,7 +574,7 @@ const JSONLD_WEBSITE = `<script type="application/ld+json">
   "@type": "WebSite",
   "name": "HostHTML.Online",
   "url": "${SITE_URL}",
-  "description": "Free HTML hosting & sharing. Upload, edit and publish HTML pages; keep them private or public.",
+  "description": "Free HTML hosting. Turn your HTML into a WebApp, personal page or landing page — upload to go live instantly on your own subdomain, public or private.",
   "potentialAction": {
     "@type": "SearchAction",
     "target": "${SITE_URL}/?q={search_term_string}",
@@ -766,8 +766,8 @@ export function renderLanding(
   const L = isZh ? LANG_ZH : LANG_EN;
   const title = isZh ? "HostHTML.Online · 免费 HTML 托管、编辑与分享" : "HostHTML.Online · Free HTML Hosting, Editor & Sharing";
   const desc = isZh
-    ? "免费 HTML 托管与分享。在线上传、编辑、发布 HTML 页面，可设为私有或公开分享给任何人。无需服务器，任何浏览器都能打开。"
-    : "Free HTML hosting & sharing. Upload, edit and publish HTML pages online — keep them private or share publicly with anyone. No server setup, works in any browser.";
+    ? "免费 HTML 托管，把 HTML 变成你的网页工具、个人介绍页或落地页。上传即刻上线，自动获得专属子域名；可公开分享或设为私有，无需服务器，任何浏览器都能打开。"
+    : "Free HTML hosting to turn your HTML into a WebApp, personal page or landing page. Upload to go live instantly on your own subdomain — public or private, no server setup, works in any browser.";
 
   // Paginated list of recently published pages, shown as cards.
   const listItems = opts.pages.length
