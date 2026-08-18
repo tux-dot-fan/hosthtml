@@ -621,7 +621,7 @@ const BASE_CSS = `
   ul.pages a:hover { color: var(--accent); }
   .my-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev); transition: transform .12s, box-shadow .12s, border-color .12s; display: flex; flex-direction: column; }
   .my-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); border-color: var(--accent); }
-  .my-card-cover { height: 170px; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; flex: none; }
+  .my-card-cover { aspect-ratio: 16 / 9; width: 100%; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; flex: none; }
   .my-card-cover-ph { font-size: 26px; color: var(--muted); font-family: ui-monospace, monospace; }
   .my-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .my-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -665,7 +665,7 @@ const BASE_CSS = `
   .pub-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elev); transition: transform .12s, box-shadow .12s, border-color .12s; }
   .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); border-color: var(--accent); }
   .pub-card-link { text-decoration: none !important; display: block; }
-  .pub-cover { height: 170px; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
+  .pub-cover { aspect-ratio: 16 / 9; width: 100%; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
   .pub-cover-placeholder { font-size: 28px; color: var(--muted); font-family: ui-monospace, monospace; }
   .pub-card-body { padding: 12px 14px 8px; }
   .pub-card-title { font-weight: 650; color: var(--text); font-size: 15px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
