@@ -527,7 +527,7 @@ const NAVBAR = `
       <a href="/" class="brand"><span class="logo">&lt;/&gt;</span> HostHTML</a>
       <div class="center"></div>
       <div class="right">
-        <a class="btn ghost" href="/app">App</a>
+        <a class="btn ghost" href="/app">⬆ 我的页面</a>
       </div>
     </nav>
   </div>`;
@@ -634,7 +634,7 @@ ${BASE_CSS}
     <section class="hero">
       <h1>HostHTML</h1>
       <p>Upload, edit and share HTML pages. Sign in with Google, keep your pages private or publish them for the world, and open them in any browser.</p>
-      <a class="btn" href="/app">Open app →</a>
+      <a class="btn" href="/app">⬆ 上传 / 管理我的页面 →</a>
     </section>
 
     <section class="pub-section">
