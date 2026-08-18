@@ -11,11 +11,12 @@ export const page = sqliteTable(
     userId: text("userId").notNull(),
     title: text("title").notNull(),
     slug: text("slug").notNull(),             // human/URL-friendly name
+    subdomain: text("subdomain"),             // sub-domain prefix: <subdomain>.hosthtml.online
     path: text("path").notNull(),             // R2 key: "users/<userId>/<pageId>.html"
     size: integer("size").notNull().default(0),
     isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("createdAt").notNull(),
     updatedAt: integer("updatedAt").notNull(),
   },
-  (t) => [index("idx_page_user").on(t.userId), index("idx_page_public").on(t.isPublic)],
+  (t) => [index("idx_page_user").on(t.userId), index("idx_page_public").on(t.isPublic), index("idx_page_subdomain").on(t.subdomain)],
 );

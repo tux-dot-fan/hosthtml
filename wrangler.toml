@@ -29,11 +29,18 @@ binding = "HTML_BUCKET"
 bucket_name = "hosthtml"   # run: wrangler r2 bucket create hosthtml
 
 # --- Custom domain ---
-# Bind the custom domain as a Workers route on deploy. DNS already points to
-# the worker (user confirmed).
+# The bare domain is bound as a Custom Domain (auto-manages SSL + DNS).
 [[routes]]
 pattern = "hosthtml.online"
 custom_domain = true
+
+# Wildcard subdomains cannot be Custom Domains — they use a plain Route. This
+# requires a wildcard DNS record (CNAME * -> worker) on hosthtml.online.
+# Any subdomain then hits the worker, which resolves <sub>.hosthtml.online to
+# a user page by its `subdomain` field.
+[[routes]]
+pattern = "*.hosthtml.online"
+custom_domain = false
 
 # --- Secrets (set via `wrangler secret put`) ---
 # BETTER_AUTH_SECRET   -> openssl rand -base64 32

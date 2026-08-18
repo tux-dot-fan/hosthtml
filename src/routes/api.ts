@@ -20,6 +20,22 @@ function slugify(s: string): string {
   );
 }
 
+/** Generate a globally unique subdomain prefix from a title. */
+async function uniqueSubdomain(db: ReturnType<typeof getDb>, base: string, excludeId?: string): Promise<string> {
+  let candidate = slugify(base).slice(0, 40) || "page";
+  let n = 0;
+  for (;;) {
+    const existing = await db
+      .select()
+      .from(schema.page)
+      .where(eq(schema.page.subdomain, candidate))
+      .get();
+    if (!existing || (excludeId && existing.id === excludeId)) return candidate;
+    n++;
+    candidate = (slugify(base).slice(0, 34) || "page") + "-" + n;
+  }
+}
+
 type ApiApp = {
   Variables: { user: UserVar };
   Bindings: Env;
@@ -54,6 +70,7 @@ export function createApi(getAuth: (env: Env) => Auth) {
         id: p.id,
         title: p.title,
         slug: p.slug,
+        subdomain: p.subdomain,
         size: p.size,
         isPublic: p.isPublic,
         updatedAt: p.updatedAt,
@@ -72,18 +89,20 @@ export function createApi(getAuth: (env: Env) => Auth) {
     const size = await putHtml(c.env, key, content);
 
     const db = getDb(c.env);
+    const subdomain = await uniqueSubdomain(db, String(title));
     await db.insert(schema.page).values({
       id,
       userId: user.id,
       title: String(title),
       slug: slugify(String(title)) + "-" + id.slice(-4),
+      subdomain,
       path: key,
       size,
       isPublic: false,
       createdAt: now,
       updatedAt: now,
     });
-    return c.json({ page: { id, title, isPublic: false } }, 201);
+    return c.json({ page: { id, title, isPublic: false, subdomain } }, 201);
   });
 
   api.get("/pages/:id", async (c) => {
@@ -100,6 +119,7 @@ export function createApi(getAuth: (env: Env) => Auth) {
         id: row.id,
         title: row.title,
         slug: row.slug,
+        subdomain: row.subdomain,
         size: row.size,
         isPublic: row.isPublic,
         updatedAt: row.updatedAt,
@@ -123,12 +143,19 @@ export function createApi(getAuth: (env: Env) => Auth) {
     const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : row.title;
     const isPublic = typeof body.isPublic === "boolean" ? body.isPublic : row.isPublic;
 
+    // Optional: user may change the subdomain. Ensure it's unique.
+    let subdomain = row.subdomain;
+    if (typeof body.subdomain === "string" && body.subdomain.trim()) {
+      const want = body.subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+      if (want) subdomain = await uniqueSubdomain(db, want, id);
+    }
+
     await db
       .update(schema.page)
-      .set({ title, isPublic, size, updatedAt: Date.now() })
+      .set({ title, isPublic, size, subdomain, updatedAt: Date.now() })
       .where(eq(schema.page.id, id));
 
-    return c.json({ page: { id, title, isPublic, size } });
+    return c.json({ page: { id, title, isPublic, size, subdomain } });
   });
 
   api.delete("/pages/:id", async (c) => {

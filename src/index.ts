@@ -58,6 +58,35 @@ app.get("/", (c) => c.html(renderLanding()));
 app.get("/app", (c) => c.html(renderApp({ path: "/app" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor" })));
 
+// --- Subdomain hosting: <sub>.hosthtml.online serves a user's page ---
+// Any subdomain of the site (e.g. my-page.hosthtml.online) maps to the page
+// with subdomain = "my-page". The page must be public; otherwise 404.
+app.get("*", async (c) => {
+  const host = c.req.header("host") || "";
+  // Only handle requests that are actually subdomains of the site, e.g.
+  // my-page.hosthtml.online. The bare domain (hosthtml.online) and any other
+  // host should not be treated as a page subdomain.
+  if (!host.endsWith(".hosthtml.online")) return c.notFound();
+  const prefix = host.slice(0, -".hosthtml.online".length);
+  // Skip reserved prefixes that are app routes on the bare domain.
+  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return c.notFound();
+
+  const db = getDb(c.env);
+  const row = await db
+    .select()
+    .from(schema.page)
+    .where(eq(schema.page.subdomain, prefix))
+    .get();
+  if (!row || !row.isPublic) {
+    return c.html(
+      "<!doctype html><html><head><meta charset='utf-8'/><title>Not found</title></head><body style='font-family:sans-serif;text-align:center;padding:60px 20px'><h1>404</h1><p>This page does not exist or is private.</p><p><a href='https://hosthtml.online/'>← HostHTML</a></p></body></html>",
+      404,
+    );
+  }
+  const html = (await getHtml(c.env, row.path)) ?? "<h1>(empty)</h1>";
+  return c.html(html);
+});
+
 // --- Public open page: serve the hosted HTML directly if public ---
 // If the page is private, we return a minimal 404-ish HTML instead of leaking.
 app.get("/p/:id", async (c) => {
@@ -85,6 +114,11 @@ app.get("/sitemap.xml", async (c) => {
     urls.push(
       `<url><loc>${SITE_URL}/p/${r.id}</loc><lastmod>${new Date(r.updatedAt).toISOString()}</lastmod><changefreq>monthly</changefreq></url>`,
     );
+    if (r.subdomain) {
+      urls.push(
+        `<url><loc>https://${r.subdomain}.hosthtml.online</loc><lastmod>${new Date(r.updatedAt).toISOString()}</lastmod><changefreq>monthly</changefreq></url>`,
+      );
+    }
   }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

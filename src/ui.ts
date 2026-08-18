@@ -127,6 +127,7 @@ async function loadPages() {
               <span class="vis \${p.isPublic ? "pub" : "priv"}">\${p.isPublic ? "🌍 Public" : "🔒 Private"}</span>
               \${fmtSize(p.size)} · \${new Date(p.updatedAt).toLocaleString()}
               \${p.isPublic ? \` · <a href="/p/\${p.id}" target="_blank">open ↗</a>\` : ""}
+              \${p.isPublic && p.subdomain ? \` · <a href="https://\${escapeHtml(p.subdomain)}.hosthtml.online" target="_blank">\${escapeHtml(p.subdomain)}.hosthtml.online ↗</a>\` : ""}
             </div>
           </div>
           <div class="page-actions">
@@ -208,13 +209,17 @@ async function renderEditor(pageId) {
       <span class="vis \${page.isPublic ? "pub" : "priv"}">\${page.isPublic ? "🌍 Public" : "🔒 Private"}</span>
       <label style="margin-left:12px;"><input type="checkbox" id="ed-pub" \${page.isPublic ? "checked" : ""} /> Public</label>
     </div>
+    <div class="muted" style="margin-bottom:12px;">
+      <label>专属网址：<input id="ed-sub" style="width:220px;" value="\${escapeHtml(page.subdomain || "")}" placeholder="my-page" /> .hosthtml.online</label>
+    </div>
     <textarea id="ed-content" spellcheck="false">\${escapeHtml(page.content || "")}</textarea>\`;
   document.getElementById("ed-save").onclick = async () => {
     const content = document.getElementById("ed-content").value;
     const isPublic = document.getElementById("ed-pub").checked;
     const title = page.title;
+    const subdomain = document.getElementById("ed-sub").value.trim();
     try {
-      await api(\`/api/pages/\${pageId}\`, { method: "PUT", body: JSON.stringify({ content, isPublic, title }), timeout: 60000 });
+      await api(\`/api/pages/\${pageId}\`, { method: "PUT", body: JSON.stringify({ content, isPublic, title, subdomain }), timeout: 60000 });
       toast("Saved 💾");
     } catch (err) { toast("Save failed: " + err.message); }
   };
