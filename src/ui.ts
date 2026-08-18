@@ -436,7 +436,14 @@ async function main() {
   const params = new URLSearchParams(location.search);
   const oauthError = params.get("error") || params.get("error_description");
 
-  if (path === "/") return;
+  if (path === "/") {
+    // Home page: bind the copy button on each published-page card.
+    const copiedMsg = LANG === "zh" ? "链接已复制 📋" : "Link copied 📋";
+    document.querySelectorAll(".pub-url-copy").forEach((b) => {
+      b.onclick = () => copyText(b.dataset.url, copiedMsg);
+    });
+    return;
+  }
   // /p/:id is served server-side (raw HTML), no client shell needed.
   if (path.startsWith("/p/")) return;
 
@@ -660,11 +667,15 @@ const BASE_CSS = `
   .pub-card-link { text-decoration: none !important; display: block; }
   .pub-cover { height: 130px; background-color: var(--bg-soft); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
   .pub-cover-placeholder { font-size: 28px; color: var(--muted); font-family: ui-monospace, monospace; }
-  .pub-card-body { padding: 12px 14px 14px; }
+  .pub-card-body { padding: 12px 14px 8px; }
   .pub-card-title { font-weight: 650; color: var(--text); font-size: 15px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pub-card-desc { color: var(--muted); font-size: 13px; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pub-card-footer { padding: 0 14px 14px; }
+  .pub-card-url { display: flex; align-items: center; gap: 6px; background: var(--bg-soft); border-radius: 7px; padding: 4px 8px; margin-bottom: 6px; }
+  .pub-url-text { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pub-url-copy { flex: none; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px; }
+  .pub-url-copy:hover { color: var(--accent); }
   .pub-card-meta { font-size: 12px; color: var(--muted); }
-  .pub-card-meta code { font-family: ui-monospace, monospace; }
   .pub-list li.empty { grid-column: 1 / -1; justify-self: center; color: var(--muted); padding: 20px; }
   .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 22px; }
   .pager .pg { padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; font-size: 13px; }
@@ -780,9 +791,12 @@ export function renderLanding(
             <div class="pub-card-body">
               <div class="pub-card-title">${esc(p.title) || "(untitled)"}</div>
               ${p.description ? `<div class="pub-card-desc">${esc(p.description)}</div>` : ""}
-              <div class="pub-card-meta">${p.subdomain ? `<code>${esc(p.subdomain)}.hosthtml.online</code>` : ""} · ${new Date(p.updatedAt).toLocaleDateString(L.dateLocale)}</div>
             </div>
           </a>
+          <div class="pub-card-footer">
+            <div class="pub-card-url">${p.subdomain ? `<span class="pub-url-text">${esc(p.subdomain)}.hosthtml.online</span>` : `<span class="pub-url-text">hosthtml.online/p/${esc(p.id)}</span>`}<button class="pub-url-copy" data-url="${esc(p.subdomain ? "https://" + p.subdomain + ".hosthtml.online" : "/p/" + p.id)}" title="copy">📋</button></div>
+            <div class="pub-card-meta">${new Date(p.updatedAt).toLocaleDateString(L.dateLocale)}</div>
+          </div>
         </li>`,
         )
         .join("")

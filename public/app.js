@@ -432,7 +432,14 @@ async function main() {
   const params = new URLSearchParams(location.search);
   const oauthError = params.get("error") || params.get("error_description");
 
-  if (path === "/") return;
+  if (path === "/") {
+    // Home page: bind the copy button on each published-page card.
+    const copiedMsg = LANG === "zh" ? "链接已复制 📋" : "Link copied 📋";
+    document.querySelectorAll(".pub-url-copy").forEach((b) => {
+      b.onclick = () => copyText(b.dataset.url, copiedMsg);
+    });
+    return;
+  }
   // /p/:id is served server-side (raw HTML), no client shell needed.
   if (path.startsWith("/p/")) return;
 
