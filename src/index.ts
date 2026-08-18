@@ -6,7 +6,7 @@ import { createApi } from "./routes/api";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
 import { getCover, getHtml } from "./lib/storage";
-import { renderApp, renderLanding, SITE_URL } from "./ui";
+import { renderApp, renderLanding, renderProfile, SITE_URL, type PublicPage } from "./ui";
 
 type AppEnv = {
   Bindings: Env;
@@ -37,27 +37,86 @@ app.use("*", async (c, next) => {
 // and the subdomain would never be resolved. This middleware intercepts only
 // requests whose host is a real subdomain of hosthtml.online; anything else
 // falls through to the normal routes.
+const notFoundHtml = () =>
+  "<!doctype html><html><head><meta charset='utf-8'/><title>Not found</title></head><body style='font-family:sans-serif;text-align:center;padding:60px 20px'><h1>404</h1><p>This page does not exist or is private.</p><p><a href='https://hosthtml.online/'>← hosthtml.online</a></p></body></html>";
+
+/** Render a user's profile page from their public pages. */
+async function renderUserProfile(c: import("hono").Context<AppEnv>, subdomain: string) {
+  const db = getDb(c.env);
+  const userRow = await db.select().from(schema.user).where(eq(schema.user.subdomain, subdomain)).get();
+  if (!userRow) return null;
+  const pages = await db
+    .select()
+    .from(schema.page)
+    .where(eq(schema.page.userId, userRow.id))
+    .all();
+  const pubPages: PublicPage[] = pages
+    .filter((p) => p.isPublic)
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      subdomain: p.subdomain,
+      cover: p.cover,
+      description: p.description,
+      updatedAt: p.updatedAt,
+      slug: p.slug,
+    }));
+  return c.html(renderProfile({ name: userRow.name, image: userRow.image, subdomain, pages: pubPages }));
+}
+
 app.use("*", async (c, next) => {
   const host = c.req.header("host") || "";
   if (!host.endsWith(".hosthtml.online")) return next(); // bare domain — normal routes
   const prefix = host.slice(0, -".hosthtml.online".length);
-  // Reserved prefixes must NOT be treated as page subdomains.
-  if (prefix === "app" || prefix === "api" || prefix === "www" || !prefix) return next();
+  if (!prefix) return next();
 
   const db = getDb(c.env);
-  const row = await db
-    .select()
-    .from(schema.page)
-    .where(eq(schema.page.subdomain, prefix))
-    .get();
-  if (!row || !row.isPublic) {
-    return c.html(
-      "<!doctype html><html><head><meta charset='utf-8'/><title>Not found</title></head><body style='font-family:sans-serif;text-align:center;padding:60px 20px'><h1>404</h1><p>This page does not exist or is private.</p><p><a href='https://hosthtml.online/'>← HostHTML</a></p></body></html>",
-      404,
-    );
+  const url = new URL(c.req.url);
+  const path = url.pathname;
+
+  // 1) A page-level subdomain: <pageSub>.hosthtml.online serves that page.
+  const pageRow = await db.select().from(schema.page).where(eq(schema.page.subdomain, prefix)).get();
+  if (pageRow && pageRow.isPublic) {
+    const html = (await getHtml(c.env, pageRow.path)) ?? "<h1>(empty)</h1>";
+    return c.html(html);
   }
-  const html = (await getHtml(c.env, row.path)) ?? "<h1>(empty)</h1>";
-  return c.html(html);
+
+  // 2) A user-level subdomain: <userSub>.hosthtml.online.
+  //    - "/" -> the user's profile page
+  //    - "/<slug>" -> that user's page with the given slug
+  const userRow = await db.select().from(schema.user).where(eq(schema.user.subdomain, prefix)).get();
+  if (userRow) {
+    if (path === "/" || path === "") {
+      const prof = await renderUserProfile(c, prefix);
+      if (prof) return prof;
+    }
+    // A /p/:id path under a user subdomain.
+    const pMatch = path.match(/^\/p\/([^/]+)/);
+    if (pMatch) {
+      const pid = pMatch[1];
+      const pp = await db.select().from(schema.page).where(eq(schema.page.id, pid)).get();
+      if (pp && pp.userId === userRow.id && pp.isPublic) {
+        const html = (await getHtml(c.env, pp.path)) ?? "<h1>(empty)</h1>";
+        return c.html(html);
+      }
+    }
+    // Try a page under this user by slug.
+    const slugPath = path.replace(/^\//, "").replace(/\/$/, "");
+    if (slugPath && !slugPath.startsWith("p/")) {
+      const userPages = await db
+        .select()
+        .from(schema.page)
+        .where(eq(schema.page.userId, userRow.id))
+        .all();
+      const match = userPages.find((p) => p.slug === slugPath && p.isPublic);
+      if (match) {
+        const html = (await getHtml(c.env, match.path)) ?? "<h1>(empty)</h1>";
+        return c.html(html);
+      }
+    }
+  }
+
+  return c.html(notFoundHtml(), 404);
 });
 
 // --- Health check ---
@@ -111,6 +170,7 @@ app.get("/", async (c) => {
         cover: p.cover,
         description: p.description,
         updatedAt: p.updatedAt,
+        slug: p.slug,
       })),
       page,
       totalPages,
@@ -121,6 +181,7 @@ app.get("/", async (c) => {
 
 app.get("/app", (c) => c.html(renderApp({ path: "/app", lang: c.req.query("lang") === "zh" ? "zh" : "en" })));
 app.get("/app/editor", (c) => c.html(renderApp({ path: "/app/editor", lang: c.req.query("lang") === "zh" ? "zh" : "en" })));
+app.get("/profile", (c) => c.html(renderApp({ path: "/profile", lang: c.req.query("lang") === "zh" ? "zh" : "en" })));
 
 // --- Cover image: served from R2 (page id -> its cover). ---
 app.get("/covers/:id", async (c) => {

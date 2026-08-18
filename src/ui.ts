@@ -12,7 +12,10 @@ const I18N = {
   en: {
     loginTitle: "Sign in", loginSub: "Sign in with Google to host and manage your HTML pages.",
     loginGoogle: "Continue with Google",
-    myPages: "My Pages", newUpload: "⬆ Upload", newBlank: "+ Blank", signOut: "Sign out",
+    myPages: "My Pages", newUpload: "⬆ Upload", newBlank: "+ Blank", signOut: "Sign out", profile: "Profile",
+    profileTitle: "Your Profile", profileSub: "Set your personal subdomain (e.g. dean.hosthtml.online). Pages without their own subdomain use yours.",
+    userSubLabel: "Your subdomain", userSubPlaceholder: "e.g. dean", saveSub: "Save", subTaken: "Subdomain taken or reserved", subSaved: "Subdomain saved ✅", subCleared: "Subdomain removed",
+    profilePublicTitle: "Public pages",
     noPages: "No pages yet. Click upload or blank to create one.", loading: "Loading…",
     pub: "🌍 Public", priv: "🔒 Private", open: "Open ↗",
     actEdit: "✏️ Edit", actView: "👁 Open", actPub: "🌍 Publish", actPriv: "🔒 Make private",
@@ -30,7 +33,10 @@ const I18N = {
   zh: {
     loginTitle: "登录", loginSub: "使用 Google 登录，托管和管理你的 HTML 页面。",
     loginGoogle: "使用 Google 继续",
-    myPages: "我的页面", newUpload: "⬆ 上传", newBlank: "+ 空白", signOut: "退出登录",
+    myPages: "我的页面", newUpload: "⬆ 上传", newBlank: "+ 空白", signOut: "退出登录", profile: "个人主页",
+    profileTitle: "你的个人主页", profileSub: "设置你的个人子域名（如 dean.hosthtml.online）。未设置页面子域的页面会使用你的个人子域。",
+    userSubLabel: "你的子域名", userSubPlaceholder: "例如 dean", saveSub: "保存", subTaken: "子域名已被占用或保留", subSaved: "子域名已保存 ✅", subCleared: "子域名已移除",
+    profilePublicTitle: "公开页面",
     noPages: "还没有页面。点击上传或空白创建。", loading: "加载中…",
     pub: "🌍 公开", priv: "🔒 私有", open: "打开 ↗",
     actEdit: "✏️ 编辑", actView: "👁 打开", actPub: "🌍 发布", actPriv: "🔒 设为私有",
@@ -180,6 +186,7 @@ function renderShell(user) {
       <div class="row">
         <button id="upload-page" class="btn" style="padding:8px 14px;">\${t.newUpload}</button>
         <button id="blank-page" class="btn ghost" style="padding:8px 14px;">\${t.newBlank}</button>
+        <button id="go-profile" class="btn ghost" style="padding:8px 14px;">👤 \${t.profile}</button>
         <button id="sign-out" class="btn ghost" style="padding:8px 14px;">\${t.signOut}</button>
       </div>
     </div>
@@ -187,11 +194,83 @@ function renderShell(user) {
     <ul class="pages" id="page-list"></ul>\`;
   document.getElementById("upload-page").onclick = uploadPage;
   document.getElementById("blank-page").onclick = blankPage;
+  document.getElementById("go-profile").onclick = () => { location.href = "/profile" + (LANG === "zh" ? "?lang=zh" : ""); };
   document.getElementById("sign-out").onclick = async () => {
     await api("/api/auth/sign-out", { method: "POST", body: JSON.stringify({}) });
     location.href = "/";
   };
   loadPages();
+}
+
+// Profile page: view + edit the user's personal subdomain.
+async function renderProfilePage() {
+  let profile = null;
+  try {
+    const res = await api("/api/profile", { timeout: 20000 });
+    profile = res.profile;
+  } catch (err) {
+    if (err.status === 401) return renderLogin(null);
+    root.innerHTML = \`<p>\${t.error} \${escapeHtml(err.message)}</p>\`;
+    return;
+  }
+  const userSub = profile.subdomain ? "https://" + profile.subdomain + ".hosthtml.online" : null;
+  root.innerHTML = \`
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">\${t.profileTitle}</h2>
+      <button id="pf-back" class="btn ghost" style="padding:8px 14px;">\${t.back}</button>
+    </div>
+    <p class="muted">\${t.profileSub}</p>
+    <section class="card" style="margin-top:16px;">
+      <div class="muted" style="margin-bottom:6px;"><strong>\${t.userSubLabel}</strong></div>
+      <div class="row">
+        <input id="pf-sub" style="width:220px;" value="\${escapeHtml(profile.subdomain || "")}" placeholder="\${t.userSubPlaceholder}" />
+        <span class="muted">.hosthtml.online</span>
+        <button id="pf-save" class="btn" style="padding:8px 16px;">\${t.saveSub}</button>
+        \${profile.subdomain ? \`<button id="pf-clear" class="btn ghost" style="padding:8px 14px;">\${LANG === "zh" ? "移除" : "Remove"}</button>\` : ""}
+      </div>
+      \${userSub ? \`<div class="muted" style="margin-top:10px;">\${LANG === "zh" ? "你的个人主页：" : "Your profile at: "}<a href="\${userSub}" target="_blank">\${escapeHtml(profile.subdomain)}.hosthtml.online ↗</a></div>\` : ""}
+    </section>
+    <section style="margin-top:24px;">
+      <h3 style="margin:0 0 12px;">\${t.profilePublicTitle}</h3>
+      <div id="pf-pages"><p class="muted">\${t.loading}</p></div>
+    </section>\`;
+  document.getElementById("pf-back").onclick = () => { location.href = "/app" + (LANG === "zh" ? "?lang=zh" : ""); };
+  document.getElementById("pf-save").onclick = async () => {
+    const sub = document.getElementById("pf-sub").value.trim();
+    try {
+      const res = await api("/api/profile", { method: "PUT", body: JSON.stringify({ subdomain: sub }) });
+      toast(res.profile.subdomain ? t.subSaved : t.subCleared);
+      renderProfilePage();
+    } catch (err) {
+      toast(t.subTaken);
+      renderProfilePage();
+    }
+  };
+  const clearBtn = document.getElementById("pf-clear");
+  if (clearBtn) clearBtn.onclick = async () => {
+    try {
+      await api("/api/profile", { method: "PUT", body: JSON.stringify({ subdomain: "" }) });
+      toast(t.subCleared);
+      renderProfilePage();
+    } catch (err) { toast(t.error + err.message); }
+  };
+  // Load the user's public pages.
+  try {
+    const { pages } = await api("/api/pages");
+    const pub = pages.filter((p) => p.isPublic);
+    const box = document.getElementById("pf-pages");
+    if (!pub.length) { box.innerHTML = \`<p class="muted">\${LANG === "zh" ? "暂无公开页面" : "No public pages yet."}</p>\`; return; }
+    box.innerHTML = \`<ul class="pages" id="pf-page-list"></ul>\`;
+    const list = document.getElementById("pf-page-list");
+    list.innerHTML = pub.map((p) => \`
+      <li class="my-card">
+        <div class="my-card-cover" \${p.cover ? \`style="background-image:url('/covers/\${p.id}')"\` : ""}>\${p.cover ? "" : '<span class="my-card-cover-ph">&lt;/&gt;</span>'}</div>
+        <div class="my-card-body">
+          <div class="my-card-title">\${escapeHtml(p.title)}</div>
+          <div class="my-card-meta">\${fmtSize(p.size)} · \${new Date(p.updatedAt).toLocaleString()}</div>
+        </div>
+      </li>\`).join("");
+  } catch (e) {}
 }
 
 async function loadPages() {
@@ -204,10 +283,17 @@ async function loadPages() {
       return;
     }
     const copiedMsg = LANG === "zh" ? "链接已复制 📋" : "Link copied 📋";
+    // User-level subdomain, for pages that don't set their own.
+    let userSub = null;
+    try { userSub = JSON.parse(sessionStorage.getItem("user") || "{}").subdomain || null; } catch (e) {}
     list.innerHTML = pages
       .map(
         (p) => {
-          const pageUrl = p.subdomain ? "https://" + p.subdomain + ".hosthtml.online" : window.location.origin + "/p/" + p.id;
+          const pageUrl = p.subdomain
+            ? "https://" + p.subdomain + ".hosthtml.online"
+            : userSub
+              ? "https://" + userSub + ".hosthtml.online/" + p.slug
+              : window.location.origin + "/p/" + p.id;
           return \`
         <li class="my-card">
           <div class="my-card-cover" \${p.cover ? \`style="background-image:url('/covers/\${p.id}')"\` : ""}>\${p.cover ? "" : '<span class="my-card-cover-ph">&lt;/&gt;</span>'}</div>
@@ -446,6 +532,20 @@ async function main() {
   }
   // /p/:id is served server-side (raw HTML), no client shell needed.
   if (path.startsWith("/p/")) return;
+
+  // Profile page (requires auth).
+  if (path === "/profile") {
+    let user;
+    try {
+      const res = await api("/api/me");
+      user = res.user;
+      sessionStorage.setItem("user", JSON.stringify(user));
+    } catch (e) {
+      if (e?.status === 401) return renderLogin(oauthError || null);
+      return renderLogin(oauthError || (e?.message || null));
+    }
+    return renderProfilePage();
+  }
 
   if (path.startsWith("/app")) {
     // Editor page needs auth + a page id.
@@ -767,6 +867,7 @@ export interface PublicPage {
   cover: string | null;
   description: string | null;
   updatedAt: number;
+  slug: string;
 }
 
 /** Landing page. */
@@ -865,6 +966,68 @@ ${BASE_CSS}
         <h3>${L.fNoServerT}</h3>
         <p>${L.fNoServerD}</p>
       </div>
+    </section>
+  </main>
+  <script>${CLIENT_JS}</script>
+</body>
+</html>`;
+}
+
+/** A user's public profile page (served at <userSub>.hosthtml.online). */
+export function renderProfile(opts: {
+  name: string;
+  image: string | null;
+  subdomain: string;
+  pages: PublicPage[];
+}): string {
+  const pubCards = opts.pages.length
+    ? opts.pages
+        .map(
+          (p) => `
+        <li class="pub-card">
+          <a class="pub-card-link" href="https://${esc(opts.subdomain)}.hosthtml.online/p/${esc(p.id)}">
+            <div class="pub-cover" ${p.cover ? `style="background-image:url('/covers/${esc(p.id)}')"` : ""}>${p.cover ? "" : '<span class="pub-cover-placeholder">&lt;/&gt;</span>'}</div>
+            <div class="pub-card-body">
+              <div class="pub-card-title">${esc(p.title) || "(untitled)"}</div>
+              ${p.description ? `<div class="pub-card-desc">${esc(p.description)}</div>` : ""}
+            </div>
+          </a>
+          <div class="pub-card-footer">
+            <div class="pub-card-url"><span class="pub-url-text">${esc(opts.subdomain)}.hosthtml.online/${esc(p.slug || p.id)}</span><button class="pub-url-copy" data-url="https://${esc(opts.subdomain)}.hosthtml.online/${esc(p.slug || p.id)}" title="copy">📋</button></div>
+            <div class="pub-card-meta">${new Date(p.updatedAt).toLocaleDateString()}</div>
+          </div>
+        </li>`,
+        )
+        .join("")
+    : `<li class="empty">No public pages yet.</li>`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${esc(opts.name)} · ${esc(opts.subdomain)}.hosthtml.online</title>
+<meta name="description" content="Published pages and profile of ${esc(opts.name)} on HostHTML.Online." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M20 20h24v6H26v6h14v6H26v6h18v6H20z' fill='%23fff'/%3E%3C/svg%3E" />
+<style>
+${BASE_CSS}
+.pf-header { text-align: center; padding: 40px 20px 10px; }
+.pf-avatar { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border); margin: 0 auto 14px; display: block; }
+.pf-avatar-ph { width: 84px; height: 84px; border-radius: 50%; background: var(--bg-soft); display: flex; align-items: center; justify-content: center; font-size: 34px; color: var(--muted); margin: 0 auto 14px; }
+.pf-name { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+.pf-url { font-size: 14px; color: var(--accent); font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="pf-header">
+      ${opts.image ? `<img class="pf-avatar" src="${esc(opts.image)}" alt="" />` : '<div class="pf-avatar-ph">👤</div>'}
+      <h1 class="pf-name">${esc(opts.name)}</h1>
+      <div class="pf-url">${esc(opts.subdomain)}.hosthtml.online</div>
+    </section>
+    <section class="pub-section" style="margin-top:30px;">
+      <h2>${LANG_EN.pubTitle}</h2>
+      <ul class="pub-list">${pubCards}</ul>
     </section>
   </main>
   <script>${CLIENT_JS}</script>

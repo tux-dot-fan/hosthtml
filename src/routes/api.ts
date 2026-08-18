@@ -36,6 +36,20 @@ async function uniqueSubdomain(db: ReturnType<typeof getDb>, base: string, exclu
   }
 }
 
+/** Normalize a user subdomain and ensure it's unique across users AND pages. */
+async function uniqueUserSubdomain(db: ReturnType<typeof getDb>, base: string, excludeUserId?: string): Promise<{ ok: boolean; value?: string; error?: string }> {
+  const clean = base.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  if (!clean) return { ok: false, error: "invalid subdomain" };
+  if (clean === "app" || clean === "api" || clean === "www" || clean === "admin") return { ok: false, error: "reserved subdomain" };
+  // Must not collide with another user's subdomain.
+  const user = await db.select().from(schema.user).where(eq(schema.user.subdomain, clean)).get();
+  if (user && user.id !== excludeUserId) return { ok: false, error: "subdomain already taken" };
+  // Also avoid colliding with a page's subdomain.
+  const page = await db.select().from(schema.page).where(eq(schema.page.subdomain, clean)).get();
+  if (page) return { ok: false, error: "subdomain already taken" };
+  return { ok: true, value: clean };
+}
+
 type ApiApp = {
   Variables: { user: UserVar };
   Bindings: Env;
@@ -49,9 +63,54 @@ export function createApi(getAuth: (env: Env) => Auth) {
     const auth = getAuth(c.env);
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session?.user) return c.json({ error: "unauthorized" }, 401);
+    // Look up the user's stored subdomain (session.user may not include it).
+    const db = getDb(c.env);
+    const userRow = await db.select().from(schema.user).where(eq(schema.user.id, session.user.id)).get();
     return c.json({
-      user: { id: session.user.id, email: session.user.email, name: session.user.name, image: session.user.image ?? null },
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        image: session.user.image ?? null,
+        subdomain: userRow?.subdomain ?? null,
+      },
     });
+  });
+
+  // ---- Profile (requires auth): read/update the user's subdomain ----
+  api.use("/profile", requireAuth((c) => getAuth(c.env)));
+  api.get("/profile", async (c) => {
+    const user = c.get("user");
+    const db = getDb(c.env);
+    const row = await db.select().from(schema.user).where(eq(schema.user.id, user.id)).get();
+    return c.json({
+      profile: {
+        name: row?.name ?? user.name,
+        email: row?.email ?? user.email,
+        image: row?.image ?? user.image,
+        subdomain: row?.subdomain ?? null,
+        pages: 0,
+      },
+    });
+  });
+  api.put("/profile", async (c) => {
+    const user = c.get("user");
+    const { subdomain } = await c.req.json();
+    const db = getDb(c.env);
+    const row = await db.select().from(schema.user).where(eq(schema.user.id, user.id)).get();
+    if (!row) return c.json({ error: "user not found" }, 404);
+    if (typeof subdomain !== "string") return c.json({ error: "subdomain required" }, 400);
+
+    if (subdomain.trim() === "") {
+      // Clear the user subdomain.
+      await db.update(schema.user).set({ subdomain: null, updatedAt: new Date() }).where(eq(schema.user.id, user.id));
+      return c.json({ profile: { subdomain: null } });
+    }
+
+    const res = await uniqueUserSubdomain(db, subdomain, user.id);
+    if (!res.ok) return c.json({ error: res.error || "invalid subdomain" }, 400);
+    await db.update(schema.user).set({ subdomain: res.value, updatedAt: new Date() }).where(eq(schema.user.id, user.id));
+    return c.json({ profile: { subdomain: res.value } });
   });
 
   // ---- Pages CRUD (requires auth) ----
