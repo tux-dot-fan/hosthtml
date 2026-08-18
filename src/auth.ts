@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDb } from "./db";
+import * as schema from "./db/schema";
 import type { Env } from "./env";
 
 /**
@@ -15,6 +16,7 @@ export function createAuth(env: Env) {
     database: drizzleAdapter(db, {
       provider: "sqlite",
       usePlural: false, // migration uses singular table names: user, session, account, verification
+      schema, // better-auth needs the schema so it can map user/session/account/verification models
     }),
     socialProviders: {
       google: {

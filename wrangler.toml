@@ -8,12 +8,12 @@ compatibility_flags = ["nodejs_compat"]
 directory = "./public"
 binding = "ASSETS"
 
-# Build pipeline: typecheck then inline client JS into src/ui.ts.
-# NOTE: no watch_dir — scripts/inline.mjs rewrites src/ui.ts, so watching src/
-# would trigger an endless rebuild loop under `wrangler dev`. Run `npm run
-# inline` manually when iterating, or rely on deploy's one-shot build.
+# Build pipeline. For `wrangler deploy`, scripts/inline.mjs must run to embed
+# the client JS into src/ui.ts. For `wrangler dev`, inline.mjs rewrites
+# src/ui.ts and would trigger an endless rebuild loop, so dev only runs
+# typecheck. Run `npm run inline` manually before dev if you change app.js.
 [build]
-command = "npm run build"
+command = "npm run typecheck"
 cwd = "."
 
 # --- D1 Database (metadata) ---
