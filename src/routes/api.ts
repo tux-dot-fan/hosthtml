@@ -109,7 +109,13 @@ export function createApi(getAuth: (env: Env) => Auth) {
 
     const res = await uniqueUserSubdomain(db, subdomain, user.id);
     if (!res.ok) return c.json({ error: res.error || "invalid subdomain" }, 400);
-    await db.update(schema.user).set({ subdomain: res.value, updatedAt: new Date() }).where(eq(schema.user.id, user.id));
+    try {
+      await db.update(schema.user).set({ subdomain: res.value, updatedAt: new Date() }).where(eq(schema.user.id, user.id));
+    } catch (e) {
+      // Extremely unlikely, but the DB unique index can reject a concurrent
+      // duplicate even after our app-level check — surface it as "taken".
+      return c.json({ error: "subdomain already taken" }, 400);
+    }
     return c.json({ profile: { subdomain: res.value } });
   });
 
