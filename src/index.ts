@@ -100,15 +100,18 @@ app.use("*", async (c, next) => {
         return c.html(html);
       }
     }
-    // Try a page under this user by slug.
-    const slugPath = path.replace(/^\//, "").replace(/\/$/, "");
+    // Try a page under this user by slug (or by its own page subdomain).
+    const slugPath = decodeURIComponent(path.replace(/^\//, "").replace(/\/$/, ""));
     if (slugPath && !slugPath.startsWith("p/")) {
       const userPages = await db
         .select()
         .from(schema.page)
         .where(eq(schema.page.userId, userRow.id))
         .all();
-      const match = userPages.find((p) => p.slug === slugPath && p.isPublic);
+      // Match by slug OR by the page's own subdomain, any public page.
+      const match = userPages.find(
+        (p) => p.isPublic && (p.slug === slugPath || p.subdomain === slugPath),
+      );
       if (match) {
         const html = (await getHtml(c.env, match.path)) ?? "<h1>(empty)</h1>";
         return c.html(html);
